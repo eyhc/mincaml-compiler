@@ -10,6 +10,7 @@ and asml_expr =
   | Sub of asml_expr * asml_expr
   | Mul of asml_expr * asml_expr
   | Assign of string * asml_expr
+  | Tuple of string * string * asml_expr
 
 and asm_function = {
   name : string;
@@ -20,13 +21,20 @@ and asm_function = {
 let rec generate_asm_expr : asml_expr -> string list = function
   | Var _ | Int _ -> []
   | Let (var, expr) ->
-    let rec extract_int_value = function
-      | Int n -> n
-      | _ -> failwith "Expected an integer value in the Let expression"
-    in
-    let int_value = extract_int_value expr in
-    let asm_expr = generate_asm_expr expr in
-    asm_expr @ ["MOV " ^ var ^ ", " ^ string_of_int int_value]
+    (match expr with
+     | Int n ->
+       let asm_expr = generate_asm_expr expr in
+       asm_expr @ ["MOV " ^ var ^ ", " ^ string_of_int n]
+     | Tuple (reg, mem_pos, inner_expr) ->
+       let int_value =
+         match inner_expr with
+         | Int n -> n
+         | _ -> failwith "Expected an integer value in the Let expression"
+       in
+       let asm_expr = generate_asm_expr inner_expr in
+       asm_expr @ ["LD " ^ reg ^ ", " ^ mem_pos; "MOV " ^ reg ^ ", " ^ string_of_int int_value]
+     | _ -> failwith "Invalid expression in Let")  
+      
   | Assign (var, value) ->
     let rec generate_assign_value = function
       | Var _ | Int _ -> []
@@ -82,20 +90,21 @@ let () =
           [ Fun {
               name = "_";
               params = [];
-              body = [Let ("x", Int 1); Let ("y", Int 2); Let ("a", Int 8);
+              body = [Let ("x", Tuple("r0", "[FP - 4]", Int 5)); Let ("y", Int 2); Let ("a", Int 8);
                       Let ("b", Int 14); Assign ("a", Sub (Var "x", Var "y"));
-                      Assign ("z", Add (Var "x", Var "y")); Assign ("b", Mul (Var "a", Var "z"))];
+                      Assign ("z", Add (Var "x", Var "y")); 
+                      Assign ("b", Mul (Var "a", Var "z"))];
             };
             Fun {
               name = "_f1";
               params = [];
-              body = [Let ("m", Int 5); Let ("n", Int 3); Assign ("p", Add (Var "m", Var "n"))];
+              body = [Let ("m", Int 5); Let ("n", Int 3); Assign ("p", Add (Var "m", Int 4))];
             };
             Fun {
               name = "_f2";
               params = [];
-              body = [Let ("q", Int 10); Let ("r", Int 4); Assign ("s", Sub (Var "q", Var "r"));
-                      Assign ("t", Mul (Var "q", Var "r"))];
+              body = [Let ("q", Int 10); Let ("r", Int 4); Assign ("s", Sub (Var "q", Int 3));
+                      Assign ("t", Mul (Var "q", Int 5))];
             }
           ])
   in
