@@ -6,6 +6,12 @@ let file f =
     Printf.printf "Table des symboles\n";
     List.iter (Printf.printf "%s ") table;
     print_newline ();
+
+    (*  (* Type Checking *)
+      let ast = Parser.exp Lexer.token (Lexing.from_channel inchan) in
+      Typechecker.typeCheck ast;   
+    *)
+
     close_in inchan
   with e -> (close_in inchan; raise e)
 
