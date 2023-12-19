@@ -1,15 +1,15 @@
 type asml =
-  | Fun of asm_function * asml list
+  | Code of asml_expr list
 
 and asml_expr =
   | Var of string
   | Int of int
   | Let of string * asml_expr
+  | Fun of asm_function
   | Add of asml_expr * asml_expr
   | Sub of asml_expr * asml_expr
   | Mul of asml_expr * asml_expr
   | Assign of string * asml_expr
-  | End of unit
 
 and asm_function = {
   name : string;
@@ -42,40 +42,61 @@ let rec generate_asm_expr : asml_expr -> string list = function
         ["MUL " ^ var ^ ", " ^ src1 ^ ", " ^ src2]
       | Mul (Var src1, Int n) ->
         ["MUL " ^ var ^ ", " ^ src1 ^ ", " ^ string_of_int n]
+      | _ -> failwith "Unsupported operation outside Assign"
     in
     let asm_value = generate_assign_value value in
     asm_value
-  | End () -> ["!EPILOGUE BEGIN"; "ADD SP, FP, 0"; "LDR FP, [SP]"; "ADD SP, SP, 4"; "!EPILOGUE END"]
-  | _ -> failwith "Unsupported operation outside Assign"
-
-let generate_prologue size =
-  ["!PROLOGUE BEGIN"; "ADD SP, SP, -4"; "STR FP, [SP]"; "ADD FP, SP, 0"; "ADD SP, SP, -" ^ string_of_int (size * 4) ^ "\n!PROLOGUE END"]
-
-let generate_asm_fun : asm_function -> string list =
-  fun { name; params; body } ->
+  | Fun { name; params; body } ->
     let rec generate_asm_fun_internal acc = function
-      | [] -> acc
+      | [] -> acc @ ["!EPILOGUE BEGIN"; "ADD SP, FP, 0"; "LDR FP, [SP]"; "ADD SP, SP, 4"; "!EPILOGUE END"]
       | hd :: tl ->
         let asm_hd = generate_asm_expr hd in
         generate_asm_fun_internal (acc @ asm_hd) tl
     in
     let size = List.length (List.filter (function Let _ | Assign _ -> true | _ -> false) body) in
     generate_prologue size @ generate_asm_fun_internal [] body
+  | _ -> failwith "Unsupported operation outside Assign"
 
-let rec generate_asm : asml -> string list = function
-  | Fun (main, functions) ->
-    let main_asm = generate_asm_fun main in
-    let functions_asm = List.flatten (List.map generate_asm functions) in
-    main_asm @ functions_asm
+and generate_prologue size =
+  ["!PROLOGUE BEGIN"; "ADD SP, SP, -4"; "STR FP, [SP]"; "ADD FP, SP, 0"; "ADD SP, SP, -" ^ string_of_int (size * 4) ^ "\n!PROLOGUE END"]
+
+let generate_asm_fun : asm_function -> string list =
+  fun { name; params; body } ->
+    generate_prologue (List.length (List.filter (function Let _ | Assign _ -> true | _ -> false) body))
+    @ generate_asm_expr (Fun { name; params; body })
+
+let generate_asm : asml -> string list = function
+  | Code exprs ->
+    let rec generate_asm_internal acc = function
+      | [] -> acc
+      | hd :: tl ->
+        let asm_hd = generate_asm_expr hd in
+        generate_asm_internal (acc @ asm_hd) tl
+    in
+    generate_asm_internal [] exprs
 
 let () =
   let result_asm =
     generate_asm
-      (Fun
-         ({ name = "_"; params = []; body = [Let ("x", Int 1); Let ("y", Int 2); Let ("a", Int 8);
-         Let ("b", Int 14); Assign ("a", Sub (Var "x", Var "y")); Assign ("z", Add (Var "x", Var "y"));
-          Assign ("b", Mul(Var "a", Var "z")); End()]},
-          [Fun ({name = "_f"; params = []; body = [Let ("h", Int 5); 
-          Let ("v", Int 9); Assign ("s", Add (Var "h", Var "v")); End()]}, [])]))
+      (Code
+          [ Fun {
+              name = "_";
+              params = [];
+              body = [Let ("x", Int 1); Let ("y", Int 2); Let ("a", Int 8);
+                      Let ("b", Int 14); Assign ("a", Sub (Var "x", Var "y"));
+                      Assign ("z", Add (Var "x", Var "y")); Assign ("b", Mul (Var "a", Var "z"))];
+            };
+            Fun {
+              name = "_f1";
+              params = [];
+              body = [Let ("m", Int 5); Let ("n", Int 3); Assign ("p", Add (Var "m", Var "n"))];
+            };
+            Fun {
+              name = "_f2";
+              params = [];
+              body = [Let ("q", Int 10); Let ("r", Int 4); Assign ("s", Sub (Var "q", Var "r"));
+                      Assign ("t", Mul (Var "q", Var "r"))];
+            }
+          ])
   in
   List.iter print_endline result_asm
