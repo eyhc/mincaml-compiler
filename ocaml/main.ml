@@ -1,10 +1,11 @@
-let print_ast l =
-  print_string (Syntax.to_string (Parser.exp Lexer.token l)); print_newline ()
-
 let file f = 
   let inchan = open_in f in
   try
-    print_ast (Lexing.from_channel inchan);
+    let ast = Parser.exp Lexer.token (Lexing.from_channel inchan) in
+    let table = (Syntax.find_variables ast []) in
+    Printf.printf "Table des symboles\n";
+    List.iter (Printf.printf "%s ") table;
+    print_newline ();
     close_in inchan
   with e -> (close_in inchan; raise e)
 
