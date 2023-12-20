@@ -87,6 +87,19 @@ let asml_show asml =
   | [] -> ()
 ;; *)
 
+let key_in_hash hash key =
+  try 
+    Hashtbl.find hash key;
+    true
+  with e -> (false)
+;;
+
+let add_hash hash key value =
+  if not (key_in_hash hash key) then 
+    Hashtbl.add hash key value;
+  hash
+;;
+
 let modify_value hashmap key value =
   match (Hashtbl.find_opt hashmap key) with
   | Some lst -> Hashtbl.replace hashmap key (List.hd lst :: value :: []); hashmap
@@ -101,14 +114,14 @@ let get_vars asml =
     | Let (s, e) ->
         Hashtbl.add hash s [ind; -1];
         g_v e (l @ [s]) hash (ind + 1)
-    | Assign (s, e) -> 
-        asml_show [e]; Printf.printf "%d\n" ind;
+    | Assign (s, e) ->
+        if not (key_in_hash hash s) then 
+          Hashtbl.add hash s [ind; -1]; 
+        asml_show [e];
         g_v e (l @ [s]) (modify_value hash s (ind) ) (ind)
     | Add (e1, e2) | Mul (e1, e2) | Sub (e1, e2) -> 
         g_v e2 (l @ (fst (g_v e1 [] hash (ind)))) hash (ind)
     | Fun f ->  iter_list f.body l hash ind
-        (* List.iter (fun param -> g_v param ) f.params; *)
-        (* List.iter (fun expr -> g_v expr ) f.body *)
     | _ -> (l, hash) (* Handle other cases as needed *)
     
   and 

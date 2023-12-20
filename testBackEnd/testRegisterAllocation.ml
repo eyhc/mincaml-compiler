@@ -31,9 +31,9 @@ let add_variable_value hashtable key value =
 ;;
 
 (* Returns true if variable `var` is in stack *)
-let var_in_stack stack var =
+let key_in_hash hash key =
   try 
-    Hashtbl.find stack var;
+    Hashtbl.find hash key;
     true
   with e -> (false)
 ;;
@@ -42,9 +42,9 @@ let var_in_stack stack var =
   If the variable `var` is not in the stakc,
   calculates it's position and adds it into the stack
 *)
-let add_stack stack var =
-  if not (var_in_stack stack var) then 
-    Hashtbl.add stack var ((Hashtbl.length stack + 1) * 4)
+let add_hash hash key =
+  if not (key_in_hash hash key) then 
+    Hashtbl.add hash key ((Hashtbl.length hash + 1) * 4)
 ;;
 
 (* Useless function *)
