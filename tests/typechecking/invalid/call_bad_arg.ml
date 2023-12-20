@@ -1,1 +1,1 @@
-let _ = print_int ()
+let x = 1 in print_int ()

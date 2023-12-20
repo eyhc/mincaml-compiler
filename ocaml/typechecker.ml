@@ -1,19 +1,34 @@
-(* une equation est un couple de types *)
+(************************
+    TYPES & GLOBAL VAR
+ ************************)
+
+(* an equation is a pair of type *)
 type equation = Type.t * Type.t
 
-
-(* l'environnement associe à un identifiant un type *)
+(* an environment is a list of pairs of types by identifiers *)
 type environment = (Id.t * Type.t) list
 
 
-(* Environnement par défaut *)
+(* default environment *)
 let predef:environment = [
   ("print_int", Type.Fun ([Type.Int], Type.Unit)); 
   ("print_float", Type.Fun ([Type.Float], Type.Unit))
 ]
 
 
-(* generation des equations d'analyse de types *)
+(************************
+   EQUATIONS GENERATION
+ ************************)
+
+(* return the string representation of an equations list *)
+let rec to_string (x:equation list) : string =
+  match x with
+  | [] -> ""
+  | e::l -> let (t1,t2) = e in
+    Printf.sprintf "%s = %s ; %s" (Type.to_string t1) (Type.to_string t2) (to_string l)
+
+
+(* equations generation for type analysis *)
 let rec genEquations (expr:Syntax.t) (env:environment) (wanted:Type.t) : equation list =
   match expr with
   | Unit -> [ (Unit, wanted) ]
@@ -75,45 +90,104 @@ let rec genEquations (expr:Syntax.t) (env:environment) (wanted:Type.t) : equatio
   | Array(e1,e2) -> failwith "todo"
 
 
-(* convertit une liste d'équations en chaine de caractères *)
-let rec to_string (x:equation list) : string =
-  match x with
-  | [] -> ""
-  | e::l -> let (t1,t2) = e in
-    Printf.sprintf "%s = %s ; %s" (Type.to_string t1) (Type.to_string t2) (to_string l)
+(*************************
+   EQUATIONS UNIFICATION
+ *************************)
+
+(* replace t or it componenets by t2 if it's the same than t1 *)
+let rec replace_rec (t:Type.t)  (t1:Type.t) (t2:Type.t) : Type.t =
+  match t with
+  | Unit | Bool | Float | Int -> t
+  | Fun (l, t3) -> Fun (List.map (fun x -> (replace_rec x t1 t2)) l, (replace_rec t3 t1 t2))
+  | Tuple l -> Tuple (List.map (fun x -> (replace_rec x t1 t2)) l)
+  | Array t3 -> if Type.is_same t3 t1 then Array(t2) else t
+  | Var v -> if Type.is_same t t1 then t2 else t
+
+(* replace each occurence of t1 by t2 in the equation list *)
+(* bool l indicates if replacement is applied in left member of equation or not *)
+let rec replace (left:bool) (l:equation list) (t1:Type.t) (t2:Type.t) : equation list =
+    match l with
+    | [] -> []
+    | (e1,e2)::l1 ->
+      if left then
+        (replace_rec e1 t1 t2, replace_rec e2 t1 t2)::(replace left l1 t1 t2)
+      else
+        (e1, replace_rec e2 t1 t2)::(replace left l1 t1 t2)
+
+(* checks if var is or is contained t *)
+let rec occur (t:Type.t) (var:Type.t) : bool =
+  let fold_fct acc x = (acc && (occur x var)) in
+    match t with
+    | Unit | Int | Bool | Float -> false
+    | Fun (l, t3) -> (List.fold_left fold_fct false l) && (occur t3 var)
+    | Tuple l -> List.fold_left fold_fct false l
+    | Array t3 -> occur t3 var
+    | Var v -> Type.is_same t var
 
 
-
-(* resoud un systeme d'equations *)
+(* solver equation system
+ * uses unification algorithm
+ *)
 let rec resolution (el:equation list) : equation list =
+  let notunifiable = fun () -> failwith "not unifiable" in
   match el with
   | [] -> []
   | (t1,t2)::l ->
     match t1,t2 with
-      | Unit, Unit -> resolution l
-      | Bool, Bool -> resolution l
-      | Int, Int -> resolution l
-      | Float, Float -> resolution l
-      | Fun (l1, t1), Fun (l2, t2) -> failwith "todo"
-      | Tuple l1, Tuple l2 -> failwith "todo"
-      | Array t1, Array t2 -> failwith "todo"
-      | Var v1,_ -> failwith "todo"
-      | _ -> failwith "not unifiable"
+      (* Remove the equation *)
+      | Unit,Unit | Bool,Bool | Int,Int | Float,Float -> resolution l
+
+      (* Decompose & failure of decomposition *)
+      | Fun (l1, t1), Fun (l2, t2) -> 
+        (try
+          let r = (t1,t2)::(List.map2 (fun x y -> (x,y)) l1 l2) 
+            in resolution (r @ l)
+        with Invalid_argument e -> notunifiable ())
+      | Tuple l1, Tuple l2 ->
+        (try let r = List.map2 (fun x y -> (x,y)) l1 l2
+          in resolution (r @ l)
+        with Invalid_argument e -> notunifiable ())
+      | Array t1, Array t2 -> resolution ((t1,t2)::l)
+
+      (* Orient *)
+      | t,Var v -> resolution ((Var v, t)::l)
+
+      (* Elimination of variable & failure of elimination *)
+      | Var v,t ->
+        if not (occur t (Var v)) then
+          let l3 = replace true l (Var v) t in
+            (Var v, t)::resolution l3
+        else notunifiable ()
+
+      (* Failure of decomposition *)
+      | _ -> notunifiable ()
 
 
-(* replace each occurence of t1 by t2 in the equation list *)
-let rec replace (l:equation list) (t1:Type.t) (t2:Type.t) : equation list =
-  match l with
-  | [] -> []
-  | (e1,e2)::l1 ->
-    let f1 = if e1 = t1 then t2 else e1 in
-      let f2 = if e2 = t1 then t2 else e2 in
-        (f1,f2)::(replace l1 t1 t2)
+(* remove all Var on right member of equation by substitution *)
+let rec subsitution (eq:equation list) : equation list =
+  let temp = List.fold_left (fun l (t1, t2) -> replace false l t1 t2) eq eq in
+    temp
 
 
+(*************************
+  SET TYPES IN AST & MAIN
+ *************************)
 
+(* Set infered types on the ast  *)
+let rec set_types (eq:equation list) : unit =
+  match eq with
+  | [] -> ()
+  | (Var v, t2)::l -> v := Some (t2); set_types l
+  | _ -> failwith "non an solution list"
+  
 
-(* fonction de vérification de type *)
-let typeCheck (expr:Syntax.t) : unit = 
-  let l = genEquations expr predef Unit in 
-    print_string (to_string l)
+(* Main function for type inference
+ * -> generates type's equation
+ * -> solve these equations
+ * -> set infered types in the given AST (here expr)
+ *)
+let typeCheck (ast:Syntax.t) : unit = 
+  let eq = genEquations ast predef Unit in
+    let sub = subsitution (resolution eq) in
+      set_types sub;
+      print_string "Type inference : OK"
