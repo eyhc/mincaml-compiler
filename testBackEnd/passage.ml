@@ -26,8 +26,8 @@ let asml =
       name = "_";
       params = [];
       body = [Let ("x", Int 1); Let ("y", Int 2); Let ("a", Int 8);
-              Let ("b", Int 14); Assign ("a", Sub (Var "x", Var "y"));
-              Assign ("z", Add (Var "x", Var "y")); Assign ("b", Mul (Var "a", Var "z"))];
+              Let ("b", Int 14); Assign ("a", Sub (Var "x", Var "y"))
+             ;Assign ("z", Add (Var "x", Var "y"));Assign ("b", Mul (Var "a", Var "z"))];
     }
   ]
 ;;
@@ -89,8 +89,8 @@ let asml_show asml =
 
 let modify_value hashmap key value =
   match (Hashtbl.find_opt hashmap key) with
-  | Some lst -> Hashtbl.replace hashmap key (List.hd lst :: value :: List.tl lst); hashmap
-  | None -> Printf.printf "%s\n" key ; Hashtbl.add hashmap key [value]; hashmap
+  | Some lst -> Hashtbl.replace hashmap key (List.hd lst :: value :: []); hashmap
+  | None -> Hashtbl.add hashmap key [value; -1]; hashmap
 ;;
 
 let get_vars asml =
@@ -103,9 +103,9 @@ let get_vars asml =
         g_v e (l @ [s]) hash (ind + 1)
     | Assign (s, e) -> 
         asml_show [e]; Printf.printf "%d\n" ind;
-        g_v e (l @ [s]) (modify_value hash s (ind + 1) ) (ind + 1)
+        g_v e (l @ [s]) (modify_value hash s (ind) ) (ind)
     | Add (e1, e2) | Mul (e1, e2) | Sub (e1, e2) -> 
-      g_v e2 (l @ (fst (g_v e1 [] hash (ind)))) hash (ind)
+        g_v e2 (l @ (fst (g_v e1 [] hash (ind)))) hash (ind)
     | Fun f ->  iter_list f.body l hash ind
         (* List.iter (fun param -> g_v param ) f.params; *)
         (* List.iter (fun expr -> g_v expr ) f.body *)
@@ -123,7 +123,7 @@ let get_vars asml =
 ;;
 
 let (variable_list, hashtable) = get_vars asml in
-Hashtbl.iter (fun a b -> Printf.printf "\"%s\", %d %d \n" a (List.hd b) (List.nth b 1) ) hashtable; 
+Hashtbl.iter (fun a b ->Printf.printf "\"%s\", %d %d \n" a (List.hd b) (List.nth b 1)) hashtable; 
 
 (* asml_list_apply asml_show asml;; *)
 (*asml_show asml;;*)
