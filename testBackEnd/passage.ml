@@ -2,7 +2,7 @@
 (* type asml =
   | Code of asml_expr list *)
 
-type asml_expr =
+  type asml_expr =
   | Var of string
   | Int of int
   | RegLet of string * asml_expr
@@ -33,30 +33,52 @@ let asml =
 ;;
 
 
-let rec asml_show asml = 
-  match asml with
-  | Var v -> Printf.printf "Variable: %s\n" v
-  | Int i -> Printf.printf "Integer: %d\n" i
-  | RegLet (r, e) -> 
-      Printf.printf "Register Let: %s\n" r;
-      asml_show e
-  | Let (l, e) -> 
-      Printf.printf "Let: %s\n" l;
-      asml_show e
-  | Fun f ->
-      Printf.printf "Function: %s\n" f.name;
-      Printf.printf "Params:\n";
-      List.iter (fun param -> asml_show param; Printf.printf "---\n") f.params;
-      Printf.printf "Body:\n";
-      List.iter (fun expr -> asml_show expr; Printf.printf "---\n") f.body
-  | _ -> () (* Handle other cases as needed *)
+let asml_show asml = 
+  let rec asml_show_unit asml = 
+    match asml with
+    | Var v -> Printf.printf "%s" v
+    | Int i -> Printf.printf "%d" i
+    | RegLet (r, e) -> 
+        Printf.printf "Register Let: %s\n" r;
+        asml_show_unit e
+    | Let (l, e) -> 
+        Printf.printf "Let %s = " l;
+        asml_show_unit e;
+        Printf.printf "\n"
+    | Assign (s, e) -> 
+        Printf.printf "%s = " s;
+        asml_show_unit e;
+        Printf.printf "\n"
+    | Add (e1, e2) ->  
+        asml_show_unit e1;
+        Printf.printf " + ";
+        asml_show_unit e2;
+        Printf.printf "\n";    
+    | Mul (e1, e2) ->  
+        asml_show_unit e1;
+        Printf.printf " * ";
+        asml_show_unit e2;
+        Printf.printf "\n";
+    | Sub (e1, e2) ->  
+        asml_show_unit e1;
+        Printf.printf " - ";
+        asml_show_unit e2;
+        Printf.printf "\n";
+    | Fun f ->
+        Printf.printf "Function: %s\n" f.name;
+        Printf.printf "Params:\n";
+        List.iter (fun param -> asml_show_unit param; Printf.printf "---\n") f.params;
+        Printf.printf "Body:\n";
+        List.iter (fun expr -> asml_show_unit expr; Printf.printf "---\n") f.body
+    | _ -> () (* Handle other cases as needed *)
   
-and 
+  and 
   
-  asml_list_show l = 
-  match l with 
-  | e :: ll -> asml_show e; asml_list_show ll;
-  | [] -> ()
+    asml_list_show l = 
+    match l with 
+    | e :: ll -> asml_show_unit e; asml_list_show ll;
+    | [] -> () 
+  in asml_list_show asml
 ;;
 
 (* let rec asml_list_apply func l = 
@@ -65,28 +87,44 @@ and
   | [] -> ()
 ;; *)
 
-let get_vars asml =
-  let rec g_v asml l = 
-    match asml with 
-    | Var v -> l @ [v]
-    | Int i -> l
-    | Let (s, e) -> g_v e (l @ [s])
-    | Assign (s, e) -> g_v e (l @ [s])
-    | Fun f ->  iter_list f.body l
-        (* List.iter (fun param -> g_v param ) f.params; *)
-        (* List.iter (fun expr -> g_v expr ) f.body *)
-    | _ -> l (* Handle other cases as needed *)
-    
-  and
-    iter_list asml_list l =
-    match asml_list with 
-    | e :: ll -> iter_list ll (g_v e l); 
-    | [] -> l
-  in
-  iter_list asml [] 
+let modify_value hashmap key value =
+  match (Hashtbl.find_opt hashmap key) with
+  | Some lst -> Hashtbl.replace hashmap key (List.hd lst :: value :: List.tl lst); hashmap
+  | None -> Printf.printf "%s\n" key ; Hashtbl.add hashmap key [value]; hashmap
 ;;
 
-List.iter (fun expr -> Printf.printf "\"%s\", " expr) (get_vars asml)
+let get_vars asml =
+  let rec g_v asml l hash ind =
+    match asml with 
+    | Var v -> (l @ [v], modify_value hash v ind)
+    | Int i -> (l, hash)
+    | Let (s, e) ->
+        Hashtbl.add hash s [ind; -1];
+        g_v e (l @ [s]) hash (ind + 1)
+    | Assign (s, e) -> 
+        asml_show [e]; Printf.printf "%d\n" ind;
+        g_v e (l @ [s]) (modify_value hash s (ind + 1) ) (ind + 1)
+    | Add (e1, e2) | Mul (e1, e2) | Sub (e1, e2) -> 
+      g_v e2 (l @ (fst (g_v e1 [] hash (ind)))) hash (ind)
+    | Fun f ->  iter_list f.body l hash ind
+        (* List.iter (fun param -> g_v param ) f.params; *)
+        (* List.iter (fun expr -> g_v expr ) f.body *)
+    | _ -> (l, hash) (* Handle other cases as needed *)
+    
+  and 
+    iter_list asml_list l hash ind =
+    match asml_list with 
+    | e :: ll -> 
+        let hash_ = (g_v e l hash ind) in
+        iter_list ll (fst hash_) (snd hash_) (ind + 1)
+    | [] -> (l, hash)
+  in
+  iter_list asml [] (Hashtbl.create 0) 1
+;;
+
+let (variable_list, hashtable) = get_vars asml in
+Hashtbl.iter (fun a b -> Printf.printf "\"%s\", %d %d \n" a (List.hd b) (List.nth b 1) ) hashtable; 
 
 (* asml_list_apply asml_show asml;; *)
+(*asml_show asml;;*)
   
