@@ -109,16 +109,17 @@ let modify_value hashmap key value =
 let get_vars asml =
   let rec g_v asml l hash ind =
     match asml with 
-    | Var v -> (l @ [v], modify_value hash v ind)
-    | Int i -> (l, hash)
+    | Var v -> (l, modify_value hash v ind)
     | Let (s, e) ->
         Hashtbl.add hash s [ind; -1];
         g_v e (l @ [s]) hash (ind + 1)
-    | Assign (s, e) ->
-        if not (key_in_hash hash s) then 
+    | Assign (s, e) -> 
+        if not (key_in_hash hash s) then begin 
           Hashtbl.add hash s [ind; -1]; 
-        asml_show [e];
-        g_v e (l @ [s]) (modify_value hash s (ind) ) (ind)
+          g_v e (l @ [s]) (modify_value hash s (ind) ) (ind)
+        end
+        else 
+          g_v e l (modify_value hash s (ind) ) (ind)
     | Add (e1, e2) | Mul (e1, e2) | Sub (e1, e2) -> 
         g_v e2 (l @ (fst (g_v e1 [] hash (ind)))) hash (ind)
     | Fun f ->  iter_list f.body l hash ind
@@ -135,9 +136,10 @@ let get_vars asml =
   iter_list asml [] (Hashtbl.create 0) 1
 ;;
 
+
 let (variable_list, hashtable) = get_vars asml in
 Hashtbl.iter (fun a b ->Printf.printf "\"%s\", %d %d \n" a (List.hd b) (List.nth b 1)) hashtable; 
-
+List.iter (fun a -> Printf.printf "%s, " a) variable_list;
 (* asml_list_apply asml_show asml;; *)
 (*asml_show asml;;*)
   
