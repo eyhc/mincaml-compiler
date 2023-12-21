@@ -189,3 +189,8 @@ start_to_end var_start_list  var_end_list hashtable
 
 (* asml_list_apply asml_show asml;; *)
 (*asml_show asml;;*)
+
+
+(* let linearScanAlloc hashmap var_list =  *)
+  
+  
