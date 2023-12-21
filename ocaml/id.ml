@@ -7,3 +7,6 @@ let genid =
   fun () ->
     incr counter;
     Printf.sprintf "?v%d" !counter
+
+let genid_list n =
+  List.init n (fun _ -> genid ())

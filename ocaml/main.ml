@@ -2,7 +2,7 @@
 
 (* version *)
 let show_version () =
-  print_endline "v0.1 - 21-12-2023";
+  print_endline "MinCamlCompiler v0.1 - 21-12-2023";
   exit 0
 
 let input = ref "" and output = ref ""
@@ -20,7 +20,7 @@ let speclist = [
 ]
 
 (* SHOW HELP IN TERM (-h option) *)
-let show_help r () =
+let show_help r =
   Arg.usage speclist usage_msg;
   exit r
 
@@ -62,12 +62,12 @@ let () =
       Arg.parse speclist (fun x -> input := x) usage_msg;
 
       if String.length !input = 0 then
-        show_help 1 ()
+        show_help 1
       else if !type_only then
         type_check_only !input
       else if !asml_only then
         print_asml !input
       else if String.length !output = 0 then
-        show_help 1 ()
+        show_help 1
       else
         main !input !output
