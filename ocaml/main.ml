@@ -1,3 +1,6 @@
+let print_ast ast =
+  print_string (Syntax.to_string ast); print_newline ()
+
 let file f = 
   let inchan = open_in f in
   try
@@ -10,9 +13,16 @@ let file f =
     (*Printf.printf("%s") res;*)
 
     (*let table = (Syntax.find_variables ast []) in
+    let c_ast = (K_normalization.k_normalization (Syntax.clone_ast ast)) in
+    (* let table = (Syntax.find_variables ast []) in
     Printf.printf "Table des symboles\n";
     List.iter (Printf.printf "%s ") res;
     print_newline ();*)
+    List.iter (Printf.printf "%s ") table;
+    print_newline (); *)
+    print_ast ast;
+    print_newline ();
+    print_ast c_ast;
     close_in inchan
   with e -> (close_in inchan; raise e)
 
