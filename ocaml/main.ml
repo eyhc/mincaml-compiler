@@ -5,9 +5,19 @@ let file f =
   let inchan = open_in f in
   try
     let ast = Parser.exp Lexer.token (Lexing.from_channel inchan) in
+    (*let env = Typechecker.predef in
+    let liste_equation = Typechecker.genEquations ast env Int in
+    let res = Typechecker.to_string liste_equation in*)
+    Typechecker.typeCheck(ast);
+    Printf.printf("Resultat\n");
+    (*Printf.printf("%s") res;*)
+
+    (*let table = (Syntax.find_variables ast []) in
     let c_ast = (K_normalization.k_normalization (Syntax.clone_ast ast)) in
     (* let table = (Syntax.find_variables ast []) in
     Printf.printf "Table des symboles\n";
+    List.iter (Printf.printf "%s ") res;
+    print_newline ();*)
     List.iter (Printf.printf "%s ") table;
     print_newline (); *)
     print_ast ast;
