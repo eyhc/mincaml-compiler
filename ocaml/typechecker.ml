@@ -2,11 +2,11 @@
 typechecker.ml
 
 date : 21-12-2023
-authors : Carrot Elie
 
 TODO :
   - gen_equations : case tuple list array + LET-REC
   - default type  : int in substitution
+  - syntax rm
 *)
 
 
@@ -208,4 +208,3 @@ let type_check (ast:Syntax.t) : unit =
   let eq = gen_equations ast predef Unit in
     let sub = subsitution (resolution eq) in
       set_types sub;
-      print_endline "Type inference : OK";

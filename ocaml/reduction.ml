@@ -4,7 +4,6 @@ open Syntax
 reduction.ml
 
 date : 21-12-2023
-authors : Carrot Elie
 *)
 
 (* reduction of nested let-expression *)
@@ -23,5 +22,12 @@ let rec reduction (ast:t) : t =
     in insert (reduction e1)
   | LetRec (fd, e) -> 
     LetRec ({ name = fd.name; args = fd.args; body = reduction fd.body }, reduction e)
-  | LetTuple (l, e1, e2) -> LetTuple (l, e1, reduction e2)
+  | LetTuple (l, e1, e2) -> 
+    let rec insert =
+      (function
+      | Let (yt, e3, e4) -> Let (yt, e3, insert e4)
+      | LetRec (fundefs, e) -> LetRec (fundefs, insert e)
+      | LetTuple (yts, z, e) -> LetTuple (yts, z, insert e)
+      | e -> LetTuple (l, e, reduction e2))
+    in insert (reduction e1)
   | _ -> ast
