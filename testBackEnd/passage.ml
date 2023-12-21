@@ -103,21 +103,22 @@ let add_hash hash key value =
 let modify_value hashmap key value =
   match (Hashtbl.find_opt hashmap key) with
   | Some lst -> Hashtbl.replace hashmap key (List.hd lst :: value :: []); hashmap
-  | None -> Hashtbl.add hashmap key [value; -1]; hashmap
+  | None -> Hashtbl.add hashmap key [value; value]; hashmap
 ;;
 
 let get_vars asml =
   let rec g_v asml l hash ind =
     match asml with 
-    | Var v -> (l, modify_value hash v ind)
+    | Var v ->  
+        if not (key_in_hash hash v) then 
+          (l @ [v, ind], modify_value hash v ind)
+        else
+          (l, modify_value hash v ind)
     | Let (s, e) ->
-        Hashtbl.add hash s [ind; -1];
-        g_v e (l @ [s]) hash (ind + 1)
+        g_v e l hash (ind + 1)
     | Assign (s, e) -> 
-        if not (key_in_hash hash s) then begin 
-          Hashtbl.add hash s [ind; -1]; 
-          g_v e (l @ [s]) (modify_value hash s (ind) ) (ind)
-        end
+        if not (key_in_hash hash s) then 
+          g_v e (l @ [(s, ind)]) (modify_value hash s (ind) ) (ind) 
         else 
           g_v e l (modify_value hash s (ind) ) (ind)
     | Add (e1, e2) | Mul (e1, e2) | Sub (e1, e2) -> 
@@ -136,10 +137,55 @@ let get_vars asml =
   iter_list asml [] (Hashtbl.create 0) 1
 ;;
 
+let rec add_to_list_in_order list value cmp = 
+  match list with 
+  | [] -> value :: []
+  | e :: ll -> 
+      (* snd value <= snd e *)
+      if cmp (snd value) (snd e) then value :: e :: ll else e :: add_to_list_in_order ll value cmp 
+;;
 
-let (variable_list, hashtable) = get_vars asml in
-Hashtbl.iter (fun a b ->Printf.printf "\"%s\", %d %d \n" a (List.hd b) (List.nth b 1)) hashtable; 
-List.iter (fun a -> Printf.printf "%s, " a) variable_list;
+(* 1 takes the name of the variable form a (string * int) list 
+   2 takes its `end` value from the hashtable
+   3 *)
+let start_to_end list_start list_end hash =
+  let var_name = fst (List.hd list_start) in 
+  let var = (var_name, (List.nth (Hashtbl.find hash var_name) 1)) in
+  Printf.printf "(\"%s\", %d); " (fst var) (snd var);
+  add_to_list_in_order list_end var ( <= )
+;;
+
+let create_and_initialize_register_hashtable () =
+  let my_hashtable = Hashtbl.create 9 in
+  for i = 4 to 12 do
+    Hashtbl.add my_hashtable ("r" ^ string_of_int i) 1
+  done;
+  my_hashtable
+;;
+
+let find_free_register hashtable =
+  let found_key = ref None in
+  Hashtbl.iter (fun key value ->
+      if value = 1 && !found_key = None then begin
+        found_key := Some key;
+        Hashtbl.replace hashtable key 0
+      end
+    ) hashtable;
+  !found_key
+;;
+
+
+
+let registers = create_and_initialize_register_hashtable () ;;
+let (var_start_list, hashtable) = get_vars asml ;;
+Hashtbl.iter (fun a b ->Printf.printf "\"%s\", %d %d \n" a (List.hd b) (List.nth b 1)) hashtable;;
+List.iter (fun a -> Printf.printf "(\"%s\", %d); " (fst a) (snd a)) var_start_list;;
+
+let var_end_list = [("x", 6); ("y", 6);  ("a", 7); ("z", 7); ("b", 7)];;
+
+start_to_end var_start_list  var_end_list hashtable
+ 
+
+
 (* asml_list_apply asml_show asml;; *)
 (*asml_show asml;;*)
-  
