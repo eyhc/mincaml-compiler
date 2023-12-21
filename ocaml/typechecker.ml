@@ -1,3 +1,15 @@
+(*
+typechecker.ml
+
+date : 21-12-2023
+authors : Carrot Elie
+
+TODO :
+  - gen_equations : case todo
+  - default type  : int in substitution
+*)
+
+
 (************************
     TYPES & GLOBAL VAR
  ************************)
@@ -29,45 +41,51 @@ let rec to_string (x:equation list) : string =
 
 
 (* equations generation for type analysis *)
-let rec genEquations (expr:Syntax.t) (env:environment) (wanted:Type.t) : equation list =
+let rec gen_equations (expr:Syntax.t) (env:environment) (wanted:Type.t) : equation list =
   match expr with
   | Unit -> [ (Unit, wanted) ]
   | Bool b -> [ (Bool, wanted) ]
   | Int i -> [ (Int, wanted) ]
   | Float f -> [ (Float, wanted) ]
-  | Not e -> let eq = genEquations e env Bool in
+  | Not e -> let eq = gen_equations e env Bool in
     (Bool, wanted) :: eq
-  | Neg e -> let eq = genEquations e env Int in
+  | Neg e -> let eq = gen_equations e env Int in
     (Int, wanted) :: eq
   | Add (e1, e2) -> 
-    let eq1 = genEquations e1 env Int and eq2 = genEquations e2 env Int in
+    let eq1 = gen_equations e1 env Int and eq2 = gen_equations e2 env Int in
       (Type.Int, wanted) :: eq1 @ eq2
   | Sub (e1, e2) -> 
-    let eq1 = genEquations e1 env Int and eq2 = genEquations e2 env Int in
+    let eq1 = gen_equations e1 env Int and eq2 = gen_equations e2 env Int in
       (Type.Int, wanted) :: eq1 @ eq2
   | FNeg e -> 
-    let eq = genEquations e env Float in
+    let eq = gen_equations e env Float in
       (Type.Float, wanted) :: eq
   | FAdd (e1, e2) ->
-    let eq1 = genEquations e1 env Float and eq2 = genEquations e2 env Float in
+    let eq1 = gen_equations e1 env Float and eq2 = gen_equations e2 env Float in
       (Type.Float, wanted) :: eq1 @ eq2
   | FSub (e1, e2) ->
-    let eq1 = genEquations e1 env Float and eq2 = genEquations e2 env Float in
+    let eq1 = gen_equations e1 env Float and eq2 = gen_equations e2 env Float in
       (Type.Float, wanted) :: eq1 @ eq2
   | FMul (e1, e2) ->
-    let eq1 = genEquations e1 env Float and eq2 = genEquations e2 env Float in
+    let eq1 = gen_equations e1 env Float and eq2 = gen_equations e2 env Float in
       (Type.Float, wanted) :: eq1 @ eq2
   | FDiv (e1, e2) ->
-    let eq1 = genEquations e1 env Float and eq2 = genEquations e2 env Float in
+    let eq1 = gen_equations e1 env Float and eq2 = gen_equations e2 env Float in
       (Type.Float, wanted) :: eq1 @ eq2
-  | Eq (e1, e2) -> failwith "todo"
-  | LE (e1, e2) -> failwith "todo"
+  | Eq (e1, e2) -> 
+    let t = Type.gentyp () in
+      let eq1 = gen_equations e1 env t and eq2 = gen_equations e2 env t
+        in (wanted, Type.Bool)::eq1 @ eq2
+  | LE (e1, e2) -> 
+    let t = Type.gentyp () in
+      let eq1 = gen_equations e1 env t and eq2 = gen_equations e2 env t
+        in (wanted, Type.Bool)::eq1 @ eq2
   | If (e1, e2, e3) -> 
-    let eq1 = genEquations e1 env Bool in
-      let eq2 = genEquations e2 env wanted and eq3 = genEquations e3 env wanted in
+    let eq1 = gen_equations e1 env Type.Bool in
+      let eq2 = gen_equations e2 env wanted and eq3 = gen_equations e3 env wanted in
         eq1 @ eq2 @ eq3
   | Let ((id,t), e1, e2) -> 
-    let eq1 = genEquations e1 env t and eq2 = genEquations e2 ((id,t)::env) wanted in
+    let eq1 = gen_equations e1 env t and eq2 = gen_equations e2 ((id,t)::env) wanted in
       eq1 @ eq2
   | Var id -> 
     (try
@@ -75,12 +93,12 @@ let rec genEquations (expr:Syntax.t) (env:environment) (wanted:Type.t) : equatio
     with Not_found -> failwith (Printf.sprintf "Var %s not found" id))
   | App (e1, le2) -> 
     let t1 = Type.gentyp () and t2 = Type.gentyp () in
-      let eq1 = genEquations e1 env t1 in
+      let eq1 = gen_equations e1 env t1 in
         (match le2 with
         | [] -> failwith "impossible"
         | e2::l2 ->
           if (l2 <> []) then failwith "App : multi params : todo";
-          let eq2 = genEquations e2 env t2
+          let eq2 = gen_equations e2 env t2
             in  (t1, Type.Fun ([t2] , wanted)) :: eq1 @ eq2)
   | LetRec (fd, e) -> failwith "todo"
   | LetTuple (l, e1, e2)-> failwith "todo"
@@ -114,7 +132,7 @@ let rec replace (left:bool) (l:equation list) (t1:Type.t) (t2:Type.t) : equation
       else
         (e1, replace_rec e2 t1 t2)::(replace left l1 t1 t2)
 
-(* checks if var is or is contained t *)
+(* checks if var is t or is contained in t *)
 let rec occur (t:Type.t) (var:Type.t) : bool =
   let fold_fct acc x = (acc && (occur x var)) in
     match t with
@@ -184,10 +202,10 @@ let rec set_types (eq:equation list) : unit =
 (* Main function for type inference
  * -> generates type's equation
  * -> solve these equations
- * -> set infered types in the given AST (here expr)
+ * -> set infered types in the given AST
  *)
-let typeCheck (ast:Syntax.t) : unit = 
-  let eq = genEquations ast predef Unit in
+let type_check (ast:Syntax.t) : unit = 
+  let eq = gen_equations ast predef Unit in
     let sub = subsitution (resolution eq) in
       set_types sub;
-      print_string "Type inference : OK"
+      print_endline "Type inference : OK";
