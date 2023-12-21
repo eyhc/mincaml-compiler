@@ -5,8 +5,8 @@ let file f =
     (*let env = Typechecker.predef in
     let liste_equation = Typechecker.genEquations ast env Int in
     let res = Typechecker.to_string liste_equation in*)
-    Typechecker.typeCheck(ast);
-    Printf.printf("Resultat\n");
+    Typechecker.type_check(ast);
+    (*Printf.printf("Resultat\n");*)
     (*Printf.printf("%s") res;*)
 
     (*let table = (Syntax.find_variables ast []) in
