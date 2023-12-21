@@ -18,11 +18,11 @@ let create_empty_hashtbl size =
 let find_free_register hashtable =
   let found_key = ref None in
   Hashtbl.iter (fun key value ->
-    if value = 1 && !found_key = None then begin
-      found_key := Some key;
-      Hashtbl.replace hashtable key 0
-    end
-  ) hashtable;
+      if value = 1 && !found_key = None then begin
+        found_key := Some key;
+        Hashtbl.replace hashtable key 0
+      end
+    ) hashtable;
   !found_key
 
 (* Adds in hashtable key and value *)
@@ -54,14 +54,14 @@ let find_var_pos_stack stack var =
   
 let process_variable_list register_hashtable active_variables_hashtable stack variables =
   List.iter (fun variable ->
-    match find_free_register register_hashtable with
-    | Some register_key ->
-      add_variable_value active_variables_hashtable variable register_key;
-      Printf.printf "Added variable '%s' with register: %s\n" variable register_key
-    | None ->
-      add_stack stack variable;
-      Printf.printf "The variable '%s' is on the stack, it's position is FP - %d.\n" variable (find_var_pos_stack stack variable);
-  ) variables
+      match find_free_register register_hashtable with
+      | Some register_key ->
+          add_variable_value active_variables_hashtable variable register_key;
+          Printf.printf "Added variable '%s' with register: %s\n" variable register_key
+      | None ->
+          add_hash stack variable;
+          Printf.printf "The variable '%s' is on the stack, it's position is FP - %d.\n" variable (find_var_pos_stack stack variable);
+    ) variables
 
 let () =
   let register_hashtable = create_and_initialize_register_hashtable () in

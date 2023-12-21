@@ -142,4 +142,8 @@ Hashtbl.iter (fun a b ->Printf.printf "\"%s\", %d %d \n" a (List.hd b) (List.nth
 List.iter (fun a -> Printf.printf "%s, " a) variable_list;
 (* asml_list_apply asml_show asml;; *)
 (*asml_show asml;;*)
+
+
+let linearScanAlloc hashmap var_list = 
+  
   
