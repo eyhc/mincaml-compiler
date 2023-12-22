@@ -1,5 +1,6 @@
 open Arg
-
+(*Pour utiliser : ocamlc -o command command.ml
+   ./command -h*)
 let input_file = ref ""
 let output_file = ref ""
 let type_check_only = ref false
@@ -34,3 +35,7 @@ let () =
             exit(0);
     | _ -> prerr_endline (handle_error_msg);
             exit (1);
+
+        
+
+            
