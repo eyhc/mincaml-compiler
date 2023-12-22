@@ -1,6 +1,7 @@
 open Printf
 
 type t =
+  | Unit
   | Int of int
   | Var of Id.t
   | Add of t * t
@@ -49,6 +50,7 @@ let conversion (exp: Syntax.t): t =
 
   let rec convert funs (e: Syntax.t): t =
     match e with
+    | Unit -> Unit
     | Int i -> Int(i)
     | Var id -> Var(id)
     | Add(left, right) -> Add(convert funs left, convert funs right)
@@ -85,6 +87,7 @@ let rec to_string exp =
   in
 
   match exp with
+  | Unit -> "()"
   | Int i -> string_of_int i
   | Var id -> id
   | Add(left, right) -> (to_string left) ^ " + " ^ (to_string right)

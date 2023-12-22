@@ -46,12 +46,12 @@ let type_check_only f =
 let print_asml f =
   let ast = get_ast f in
     (*Typechecker.type_check ast;*)              (* Typechecking *)
-    (*let ast = Knorm.k_normalization ast in *)  (* K-normalization *)
-    let ast = Alpha.conversion ast in        (* alpha-conversion *)
+    let ast = Knorm.k_normalization ast in  (* K-normalization *)
+    (* let ast = Alpha.conversion ast in      (*  alpha-conversion *)*)
     let ast = Reduction.reduction ast in     (* reduction of nested-let *)
-                                             (* closure conversion *)
+    let ast = Closure.conversion ast in      (* closure conversion *)
                                              (* ASML generation *)
-    print_endline (Syntax.to_string ast)     (* Affichage *)
+    print_endline (Closure.to_string ast)     (* Affichage *)
 
 
 let main (inp:string) (out:string) : unit = 
