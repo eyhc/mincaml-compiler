@@ -7,7 +7,7 @@ type asml_expr =
   | Sub of asml_expr * asml_expr
   | Mul of asml_expr * asml_expr
   | Assign of string * asml_expr
-  | Tuple of (string * string)
+  | Tuple of (string * string * int)
 
 and asm_function = {
   name : string;
@@ -20,15 +20,20 @@ let rec generate_asm_expr : asml_expr -> string list = function
   | Let (expr1, expr2) ->
 
     let get_var_result = function
-      | Tuple (inner_var, _) -> inner_var
+      | Tuple (inner_var, _, _) -> inner_var
       | Int n -> "#" ^ string_of_int n
+      | _ -> failwith "Invalid expression in Let"
+    in
+
+    let get_mem_pos_result = function
+      | Tuple (_, mem_pos, _) -> mem_pos
       | _ -> failwith "Invalid expression in Let"
     in
 
     let ld_expr1 =
       match expr1 with
-      | Tuple (inner_var1, inner_mem_pos1) ->
-          if inner_mem_pos1 <> "" then
+      | Tuple (inner_var1, inner_mem_pos1, in_register) ->
+          if in_register == 0 then
             ["LDR " ^ inner_var1 ^ ", " ^ inner_mem_pos1]
           else
             []
@@ -37,15 +42,16 @@ let rec generate_asm_expr : asml_expr -> string list = function
 
     let ld_expr2 =
       match expr2 with
-      | Tuple (inner_var2, inner_mem_pos2) ->
-          if inner_mem_pos2 <> "" then
+      | Tuple (inner_var2, inner_mem_pos2, in_register) ->
+          if in_register == 0 then
             ["LDR " ^ inner_var2 ^ ", " ^ inner_mem_pos2]
           else
             []
       | _ -> []
     in
 
-    ld_expr1 @ ld_expr2 @ ["MOV " ^ get_var_result expr1 ^ ", " ^ get_var_result expr2]
+    ld_expr1 @ ld_expr2 @ ["MOV " ^ get_var_result expr1 ^ ", " ^ get_var_result expr2;
+     "STR " ^ get_var_result expr1 ^ ", " ^ get_mem_pos_result expr1]
 
   | Fun { name; params; body } ->
     let rec generate_asm_fun_internal acc = function
@@ -80,11 +86,11 @@ let () =
           name = "_";
           params = [];
           body = [
-            Let (Tuple("x", ""), Int 5);
-            Let (Tuple("y", "[FP - 4]"), Int 10);
-            Let (Tuple("z", "[FP - 4]"), Tuple("w", ""));
-            Let (Tuple("a", "[FP - 4]"), Tuple("b", "[FP - 8]"));
-            Let (Tuple("c", ""), Tuple("d", "[FP - 8]"));
+            Let (Tuple("x", "[FP - 4]", 0), Int 5);
+            Let (Tuple("y", "[FP - 8]", 1), Int 10);
+            Let (Tuple("z", "[FP - 12]", 0), Tuple("w", "[FP - 16]", 1));
+            Let (Tuple("a", "[FP - 20]", 1), Tuple("b", "[FP - 24]", 1));
+            Let (Tuple("c", "[FP - 28]", 1), Tuple("d", "[FP - 32]", 0));
           ];
         }
       ]
