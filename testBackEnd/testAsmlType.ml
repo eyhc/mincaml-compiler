@@ -171,7 +171,7 @@ let rec generate_asm_expr : asml_expr -> string list = function
 
   | Fun { name; params; body } ->
     let rec generate_asm_fun_internal acc = function
-      | [] -> acc @ ["!EPILOGUE BEGIN"; "ADD SP, FP, #0"; "LDR FP, [SP]"; "ADD SP, SP, #4"; "!EPILOGUE END"]
+      | [] -> acc @ ["ADD SP, FP, #0"; "LDR FP, [SP]"; "ADD SP, SP, #4"]
       | hd :: tl ->
         let asm_hd = generate_asm_expr hd in
         generate_asm_fun_internal (acc @ asm_hd) tl
@@ -182,7 +182,7 @@ let rec generate_asm_expr : asml_expr -> string list = function
   | _ -> failwith "Unsupported operation"
 
 and generate_prologue size =
-  ["!PROLOGUE BEGIN"; "ADD SP, SP, #-4"; "STR FP, [SP]"; "ADD FP, SP, #0"; "ADD SP, SP, #-" ^ string_of_int (size * 4) ^ "\n!PROLOGUE END"]
+  ["ADD SP, SP, #-4"; "STR FP, [SP]"; "ADD FP, SP, #0"; "ADD SP, SP, #-" ^ string_of_int (size * 4)]
 
 let generate_asm (exprs: asml_expr list) : string list =
   let rec generate_asm_internal acc = function
@@ -245,6 +245,11 @@ let () =
         }
       ]
   in
-  List.iter print_endline result_asm
+  let output_file = "output.asm" in
+  let oc = open_out output_file in
+  List.iter (fun instruction -> output_string oc (instruction ^ "\n")) result_asm;
+  close_out oc;
+  print_endline ("Results written to " ^ output_file)
+  
 
 
