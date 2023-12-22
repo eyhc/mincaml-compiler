@@ -2,11 +2,11 @@
 typechecker.ml
 
 date : 21-12-2023
-authors : Carrot Elie
 
 TODO :
-  - gen_equations : case todo
+  - gen_equations : case tuple list array + LET-REC
   - default type  : int in substitution
+  - syntax rm
 *)
 
 
@@ -39,6 +39,9 @@ let rec to_string (x:equation list) : string =
   | e::l -> let (t1,t2) = e in
     Printf.sprintf "%s = %s ; %s" (Type.to_string t1) (Type.to_string t2) (to_string l)
 
+(* returns a list of n new Var type *)
+let new_list_var (n:int) : Type.t list =
+  List.init n (fun i -> Type.gentyp ())
 
 (* equations generation for type analysis *)
 let rec gen_equations (expr:Syntax.t) (env:environment) (wanted:Type.t) : equation list =
@@ -92,14 +95,11 @@ let rec gen_equations (expr:Syntax.t) (env:environment) (wanted:Type.t) : equati
       let _,t1 = List.find (fun (x,y) -> x = id) env in [(t1, wanted)]
     with Not_found -> failwith (Printf.sprintf "Var %s not found" id))
   | App (e1, le2) -> 
-    let t1 = Type.gentyp () and t2 = Type.gentyp () in
-      let eq1 = gen_equations e1 env t1 in
-        (match le2 with
-        | [] -> failwith "impossible"
-        | e2::l2 ->
-          if (l2 <> []) then failwith "App : multi params : todo";
-          let eq2 = gen_equations e2 env t2
-            in  (t1, Type.Fun ([t2] , wanted)) :: eq1 @ eq2)
+    let t1 = Type.gentyp () and n = List.length le2 in
+      let vars = new_list_var n in
+        let eq1 = gen_equations e1 env t1  in
+          let leq2 = List.fold_left2 (fun acc x y -> (gen_equations y env x) @ acc) [] vars le2
+              in  (t1, Type.Fun (vars , wanted)) :: eq1 @ leq2
   | LetRec (fd, e) -> failwith "todo"
   | LetTuple (l, e1, e2)-> failwith "todo"
   | Get(e1, e2) -> failwith "todo"
@@ -208,4 +208,3 @@ let type_check (ast:Syntax.t) : unit =
   let eq = gen_equations ast predef Unit in
     let sub = subsitution (resolution eq) in
       set_types sub;
-      print_endline "Type inference : OK";
