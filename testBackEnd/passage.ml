@@ -161,8 +161,8 @@
  ;;
  
  let rec get_last_el = function
-   | [] -> [] 
-   | e :: [] -> e
+   | [] -> raise EOL 
+   | [e] -> e
    | e :: ll -> get_last_el ll
  ;;
  
@@ -219,23 +219,13 @@
    let act = remove_el spill active in
    if (endpoint spill) > (endpoint i) then begin
      (* register[i] ← register[spill] *)
-     Hashtbl.remove active (var_name i);
-     Hashtbl.add active (var_name spill) register;
+     Hashtbl.remove var_to_register (var_name i);
+     Hashtbl.add var_to_register (var_name spill) register;
      
-     (* location[spill] ← new stack location *)
-     (* ??? *)    
- 
      (* add i to active, sorted by increasing end point *)
      add_by_increasing_func_point endpoint i act
    end
    else
-     (* location[i] ← new stack location *)
-     (* ??? *)
- 
      active 
- end
  ;;
- 
- (* asml_list_apply asml_show asml;; *)
- (*asml_show asml;;*) 
  
