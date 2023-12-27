@@ -8,6 +8,7 @@ type asml_expr =
   | Mul of asml_expr * asml_expr
   | Assign of asml_expr * asml_expr
   | Tuple of (string * string * int)
+  | Call of string * string list
 
 and asm_function = {
   name : string;
@@ -185,62 +186,37 @@ and generate_prologue size =
   ["ADD SP, SP, #-4"; "STR FP, [SP]"; "ADD FP, SP, #0"; "ADD SP, SP, #-" ^ string_of_int (size * 4)]
 
 let generate_asm (exprs: asml_expr list) : string list =
-  let rec generate_asm_internal acc = function
-    | [] -> acc
-    | hd :: tl ->
-      let asm_hd = generate_asm_expr hd in
-      generate_asm_internal (acc @ asm_hd) tl
-  in
-  generate_asm_internal [] exprs
+  match List.filter (function Fun { name; _ } when name = "_" -> true | _ -> false) exprs with
+  | [] -> failwith "No matching function with name '_'"
+  | [funExpr] ->
+    let rec generate_asm_internal acc = function
+      | [] -> acc
+      | hd :: tl ->
+        let asm_hd = generate_asm_expr hd in
+        generate_asm_internal (acc @ asm_hd) tl
+    in
+    generate_asm_internal [] [funExpr]
+  | _ :: _ :: _ -> failwith "Multiple functions with name '_' found"
 
 let () =
   let result_asm =
     generate_asm
       [
         Fun {
-          name = "_";
+          name = "_f";
           params = [];
           body = [
-
             Let (Tuple("r0", "[FP - 4]", 1), Int 10);
             Let (Tuple("r0", "[FP - 4]", 1), Tuple("r1", "[FP - 8]", 1));
             Let (Tuple("r0", "[FP - 4]", 1), Tuple("r1", "[FP - 8]", 0));
 
-            Assign(Tuple("r0", "[FP - 4]", 1), Add (Int 10, Int 20));
-            Assign(Tuple("r0", "[FP - 4]", 1), Add (Tuple("r1", "[FP - 8]", 1), Int 20));
-            Assign(Tuple("r0", "[FP - 4]", 1), Add (Tuple("r1", "[FP - 8]", 0), Int 20));
-            Assign(Tuple("r0", "[FP - 4]", 1), Add (Int 10, Tuple("r1", "[FP - 8]", 1)));
-            Assign(Tuple("r0", "[FP - 4]", 1), Add (Int 10, Tuple("r1", "[FP - 8]", 0)));
-
-            Assign(Tuple("r0", "[FP - 4]", 1), Add (Tuple("r1", "[FP - 8]", 0), Tuple("r2", "[FP - 12]", 0)));
-            Assign(Tuple("r0", "[FP - 4]", 1), Add (Tuple("r1", "[FP - 8]", 1), Tuple("r2", "[FP - 12]", 0)));
-            Assign(Tuple("r0", "[FP - 4]", 1), Add (Tuple("r1", "[FP - 8]", 0), Tuple("r2", "[FP - 12]", 1)));
-            Assign(Tuple("r0", "[FP - 4]", 1), Add (Tuple("r1", "[FP - 8]", 1), Tuple("r2", "[FP - 12]", 1)));
-
-            
-            Assign(Tuple("r0", "[FP - 4]", 1), Sub (Int 10, Int 20));
-            Assign(Tuple("r0", "[FP - 4]", 1), Sub (Tuple("r1", "[FP - 8]", 1), Int 20));
-            Assign(Tuple("r0", "[FP - 4]", 1), Sub (Tuple("r1", "[FP - 8]", 0), Int 20));
-            Assign(Tuple("r0", "[FP - 4]", 1), Sub (Int 10, Tuple("r1", "[FP - 8]", 1)));
-            Assign(Tuple("r0", "[FP - 4]", 1), Sub (Int 10, Tuple("r1", "[FP - 8]", 0)));
-
+          ];
+        };
+        Fun {
+          name = "_";
+          params = [];
+          body = [
             Assign(Tuple("r0", "[FP - 4]", 1), Sub (Tuple("r1", "[FP - 8]", 0), Tuple("r2", "[FP - 12]", 0)));
-            Assign(Tuple("r0", "[FP - 4]", 1), Sub (Tuple("r1", "[FP - 8]", 1), Tuple("r2", "[FP - 12]", 0)));
-            Assign(Tuple("r0", "[FP - 4]", 1), Sub (Tuple("r1", "[FP - 8]", 0), Tuple("r2", "[FP - 12]", 1)));
-            Assign(Tuple("r0", "[FP - 4]", 1), Sub (Tuple("r1", "[FP - 8]", 1), Tuple("r2", "[FP - 12]", 1)));
-
-
-            Assign(Tuple("r0", "[FP - 4]", 1), Mul (Int 10, Int 20));
-            Assign(Tuple("r0", "[FP - 4]", 1), Mul (Tuple("r1", "[FP - 8]", 1), Int 20));
-            Assign(Tuple("r0", "[FP - 4]", 1), Mul (Tuple("r1", "[FP - 8]", 0), Int 20));
-            Assign(Tuple("r0", "[FP - 4]", 1), Mul (Int 10, Tuple("r1", "[FP - 8]", 1)));
-            Assign(Tuple("r0", "[FP - 4]", 1), Mul (Int 10, Tuple("r1", "[FP - 8]", 0)));
-
-            Assign(Tuple("r0", "[FP - 4]", 1), Mul (Tuple("r1", "[FP - 8]", 0), Tuple("r2", "[FP - 12]", 0)));
-            Assign(Tuple("r0", "[FP - 4]", 1), Mul (Tuple("r1", "[FP - 8]", 1), Tuple("r2", "[FP - 12]", 0)));
-            Assign(Tuple("r0", "[FP - 4]", 1), Mul (Tuple("r1", "[FP - 8]", 0), Tuple("r2", "[FP - 12]", 1)));
-            Assign(Tuple("r0", "[FP - 4]", 1), Mul (Tuple("r1", "[FP - 8]", 1), Tuple("r2", "[FP - 12]", 1)));
-
           ];
         }
       ]
