@@ -213,7 +213,7 @@
    in vsl 4 intervals
  ;;
     (* ------------Fin Functions with lists------------ *)
-    
+
  let var_in_hash hash var =
    try 
      Hashtbl.find hash var;
@@ -283,7 +283,20 @@
    in 
    remove_in_registers elem_suppr;; 
   
-   let linear_scan_register_allocation =
+ let print_hashtable my_hashtable =
+   Hashtbl.iter (fun key value ->
+       Printf.printf "%s -> %s\n" key value  (* Remplacez 'string_of_int' par une conversion appropriée pour votre type 'a' *)
+     ) my_hashtable;;
+ let print_free my_list =
+   List.iter (fun elem ->
+       Printf.printf "%s\n" elem  (* Remplacez '%s' par le format approprié pour le type réel de vos éléments *)
+     ) my_list;;
+ let print_intervals intervals =
+   List.iter (fun (key, (start, end_)) ->
+       Printf.printf "%s -> (%d, %d)\n" key start end_
+     ) intervals;;
+   
+  let linear_scan_register_allocation =
    let rec live_interval live =
     match live with (* foreach live interval i, in order of increasing start point *)
      | hd :: tail ->
@@ -316,18 +329,6 @@
    live_interval live
   
    (* TEST expireoldinterval 
-   let print_hashtable my_hashtable =
-     Hashtbl.iter (fun key value ->
-         Printf.printf "%s -> %s\n" key value  (* Remplacez 'string_of_int' par une conversion appropriée pour votre type 'a' *)
-       ) my_hashtable;;
-   let print_free my_list =
-     List.iter (fun elem ->
-         Printf.printf "%s\n" elem  (* Remplacez '%s' par le format approprié pour le type réel de vos éléments *)
-       ) my_list;;
-   let print_intervals intervals =
-     List.iter (fun (key, (start, end_)) ->
-         Printf.printf "%s -> (%d, %d)\n" key start end_
-       ) intervals;;
    
    (* Listes au point 6 :*)
    free_registers := [ "r9"; "r10"; "r11"; "r12"];; 
