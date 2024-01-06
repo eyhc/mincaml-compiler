@@ -5,10 +5,9 @@ let show_version () =
   print_endline "MinCamlCompiler v0.1 - 21-12-2023";
   exit 0
 
+(* Global variables for Arg's parser *)
 let input = ref "" and output = ref ""
-
-let type_only = ref false and asml_only = ref false
-
+let type_only = ref false and asml_only = ref false and parse_only = ref false
 let test = ref false and knorm_only = ref false and alpha = ref false and let_reduc = ref false and closure = ref false
 
 let usage_msg = Printf.sprintf "Usage: %s [options]" (Array.get Sys.argv 0)
@@ -19,6 +18,7 @@ let speclist = [
   ("-v", Arg.Unit (show_version), "Show version");
   ("-t", Arg.Unit (fun () -> type_only := true), "Type checking only");
   ("-asml", Unit (fun () -> asml_only := true), "Print asml");
+  ("-p", Arg.Unit (fun () -> parse_only := true), "Parse only");
   ("-test", Unit (fun () -> test := true), "Show test results");
   ("-knorm", Unit(fun () -> knorm_only :=true), "Knormalization only");
   ("-alpha", Unit(fun () -> alpha :=true), "Alpha-reduction");
@@ -43,10 +43,15 @@ let get_ast file =
     Parser.exp Lexer.token (Lexing.from_channel inchan)
   with e -> (close_in inchan; raise e))
 
+let print_ast f =
+  let ast = get_ast f in
+    print_endline (Syntax.to_string ast)
+
 (* Type Checking function *)
 let type_check_only f = 
   let ast = get_ast f in
     Typechecker.type_check ast;
+    print_endline (Syntax.to_string_with_types ast);
     print_endline "Type inference : OK"
 
 (* Test compiler steps functions *)
@@ -74,31 +79,33 @@ let print_closure ast =
 
 let print_test f =
   let ast = get_ast f in
-  if !knorm_only then
-    print_knorm ast
-  else if !alpha then
-    print_alpha ast
-  else if !let_reduc then
-    print_let_reduc ast
-  else if !closure then
-    print_closure ast
-  else
-    print_endline "The function you want to test is missing ! Put the corresponding argument : -knorm; -alpha; -let; -closure"
+    if !knorm_only then
+      print_knorm ast
+    else if !alpha then
+      print_alpha ast
+    else if !let_reduc then
+      print_let_reduc ast
+    else if !closure then
+      print_closure ast
+    else
+      print_endline "The function you want to test is missing ! Put the corresponding argument : -knorm; -alpha; -let; -closure"
 
 (* Display asml of file f*)
 let print_asml f =
   let ast = get_ast f in
-    (*Typechecker.type_check ast;*)              (* Typechecking *)
-    let ast = Knorm.k_normalization ast in  (* K-normalization *)
-    (* let ast = Alpha.conversion ast in      (*  alpha-conversion *)*)
-    (*let ast = Reduction.reduction ast in     (* reduction of nested-let *)
-    let ast = Closure.conversion ast in *)     (* closure conversion *)
+    Typechecker.type_check ast;              (* Typechecking *)
+    let ast = Knorm.k_normalization ast in   (* K-normalization *)
+    let ast = Alpha.conversion ast in        (*  alpha-conversion *)
+    let ast = Reduction.reduction ast in     (* reduction of nested-let *)
+    let ast = Closure.conversion ast in      (* closure conversion *)
                                              (* ASML generation *)
-    print_endline (Syntax.to_string ast)     (* Affichage *)
+    print_endline (Closure.to_string ast)     (* Affichage *)
 
 
 let main (inp:string) (out:string) : unit = 
   print_endline "compilation.... todo"
+
+
 
 (* MAIN *)
 let () = 
@@ -106,6 +113,8 @@ let () =
 
       if String.length !input = 0 then
         show_help 1
+      else if !parse_only then
+        print_ast !input
       else if !type_only then
         type_check_only !input
       else if !asml_only then

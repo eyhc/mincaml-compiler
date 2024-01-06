@@ -1,5 +1,6 @@
 ocaml/mincamlc
 ocaml/min.ml
 ocaml/.vscode/
-ocaml/main.ml
 ocaml/_build/
+.vscode
+ocaml/*.mml

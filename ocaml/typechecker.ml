@@ -1,12 +1,7 @@
 (*
 typechecker.ml
 
-date : 21-12-2023
-
-TODO :
-  - gen_equations : case tuple list array + LET-REC
-  - default type  : int in substitution
-  - syntax rm
+date : 05-01-2024
 *)
 
 
@@ -32,12 +27,13 @@ let predef:environment = [
    EQUATIONS GENERATION
  ************************)
 
-(* return the string representation of an equations list *)
+(* return the string representation of a list of equations *)
 let rec to_string (x:equation list) : string =
   match x with
   | [] -> ""
   | e::l -> let (t1,t2) = e in
     Printf.sprintf "%s = %s ; %s" (Type.to_string t1) (Type.to_string t2) (to_string l)
+
 
 (* returns a list of n new Var type *)
 let new_list_var (n:int) : Type.t list =
@@ -46,14 +42,15 @@ let new_list_var (n:int) : Type.t list =
 (* equations generation for type analysis *)
 let rec gen_equations (expr:Syntax.t) (env:environment) (wanted:Type.t) : equation list =
   match expr with
-  | Unit -> [ (Unit, wanted) ]
-  | Bool b -> [ (Bool, wanted) ]
-  | Int i -> [ (Int, wanted) ]
-  | Float f -> [ (Float, wanted) ]
+  | Unit -> [ (Type.Unit, wanted) ]
+  | Bool b -> [ (Type.Bool, wanted) ]
+  | Int i -> [ (Type.Int, wanted) ]
+  | Float f -> [ (Type.Float, wanted) ]
+
   | Not e -> let eq = gen_equations e env Bool in
-    (Bool, wanted) :: eq
+    (Type.Bool, wanted) :: eq
   | Neg e -> let eq = gen_equations e env Int in
-    (Int, wanted) :: eq
+    (Type.Int, wanted) :: eq
   | Add (e1, e2) -> 
     let eq1 = gen_equations e1 env Int and eq2 = gen_equations e2 env Int in
       (Type.Int, wanted) :: eq1 @ eq2
@@ -75,37 +72,66 @@ let rec gen_equations (expr:Syntax.t) (env:environment) (wanted:Type.t) : equati
   | FDiv (e1, e2) ->
     let eq1 = gen_equations e1 env Float and eq2 = gen_equations e2 env Float in
       (Type.Float, wanted) :: eq1 @ eq2
+
   | Eq (e1, e2) -> 
     let t = Type.gentyp () in
       let eq1 = gen_equations e1 env t and eq2 = gen_equations e2 env t
-        in (wanted, Type.Bool)::eq1 @ eq2
+        in (wanted, Type.Bool) :: eq1 @ eq2
   | LE (e1, e2) -> 
     let t = Type.gentyp () in
       let eq1 = gen_equations e1 env t and eq2 = gen_equations e2 env t
-        in (wanted, Type.Bool)::eq1 @ eq2
-  | If (e1, e2, e3) -> 
-    let eq1 = gen_equations e1 env Type.Bool in
-      let eq2 = gen_equations e2 env wanted and eq3 = gen_equations e3 env wanted in
-        eq1 @ eq2 @ eq3
-  | Let ((id,t), e1, e2) -> 
-    let eq1 = gen_equations e1 env t and eq2 = gen_equations e2 ((id,t)::env) wanted in
-      eq1 @ eq2
+        in (wanted, Type.Bool) :: eq1 @ eq2
+  
   | Var id -> 
     (try
       let _,t1 = List.find (fun (x,y) -> x = id) env in [(t1, wanted)]
     with Not_found -> failwith (Printf.sprintf "Var %s not found" id))
+
+  | If (e1, e2, e3) -> 
+    let eq1 = gen_equations e1 env Type.Bool in
+      let eq2 = gen_equations e2 env wanted and eq3 = gen_equations e3 env wanted in
+        eq1 @ eq2 @ eq3
+
+  | Let ((id,t), e1, e2) -> 
+    let eq1 = gen_equations e1 env t and eq2 = gen_equations e2 ((id,t)::env) wanted in
+      eq1 @ eq2
+
+  | LetRec (fd, e) -> 
+    let t = Type.gentyp () in
+      let eq1 = gen_equations fd.body (fd.args @ env) t in
+        let ftype = Type.Fun(List.map snd fd.args, t) in
+        let eq2 = gen_equations e ((fst fd.name, ftype)::env) wanted in
+          (snd fd.name, ftype) :: eq1 @ eq2
   | App (e1, le2) -> 
-    let t1 = Type.gentyp () and n = List.length le2 in
+    let t = Type.gentyp () and n = List.length le2 in
       let vars = new_list_var n in
-        let eq1 = gen_equations e1 env t1  in
+        let eq1 = gen_equations e1 env t  in
           let leq2 = List.fold_left2 (fun acc x y -> (gen_equations y env x) @ acc) [] vars le2
-              in  (t1, Type.Fun (vars , wanted)) :: eq1 @ leq2
-  | LetRec (fd, e) -> failwith "todo"
-  | LetTuple (l, e1, e2)-> failwith "todo"
-  | Get(e1, e2) -> failwith "todo"
-  | Put(e1, e2, e3) -> failwith "todo"
-  | Tuple(l) -> failwith "todo"
-  | Array(e1,e2) -> failwith "todo"
+              in  (t, Type.Fun (vars , wanted)) :: eq1 @ leq2
+
+  | LetTuple (l, e1, e2) ->
+    let eq1 = gen_equations e1 env (Type.Tuple (List.map snd l)) in
+      let eq2 = gen_equations e2 (l @ env) wanted in
+        eq1 @ eq2
+  | Tuple(l) ->
+    let n = List.length l in
+      let vars = new_list_var n in
+        (Type.Tuple (vars), wanted) :: (List.fold_left2 (fun acc e t -> (gen_equations e env t) @ acc) [] l vars)
+  
+  | Array(e1,e2) -> 
+    let t = Type.gentyp () in
+      let eq1 = gen_equations e1 env Type.Int and eq2 = gen_equations e2 env t in
+        (Type.Array t, wanted) :: eq1 @ eq2
+  | Get(e1, e2) -> 
+    let eq1 = gen_equations e1 env (Type.Array wanted) and eq2 = gen_equations e2 env Type.Int in
+      eq1 @ eq2
+  | Put(e1, e2, e3) -> 
+    let t = Type.gentyp () in
+      let eq1 = gen_equations e1 env (Type.Array t) in
+        let eq2 = gen_equations e2 env Type.Int in
+          let eq3 = gen_equations e3 env t in
+            (Type.Unit, wanted) :: eq1 @ eq2 @ eq3
+
 
 
 (*************************
@@ -122,7 +148,7 @@ let rec replace_rec (t:Type.t)  (t1:Type.t) (t2:Type.t) : Type.t =
   | Var v -> if Type.is_same t t1 then t2 else t
 
 (* replace each occurence of t1 by t2 in the equation list *)
-(* bool l indicates if replacement is applied in left member of equation or not *)
+(* bool left indicates if replacement is applied in left member of equation or not *)
 let rec replace (left:bool) (l:equation list) (t1:Type.t) (t2:Type.t) : equation list =
     match l with
     | [] -> []
@@ -134,57 +160,54 @@ let rec replace (left:bool) (l:equation list) (t1:Type.t) (t2:Type.t) : equation
 
 (* checks if var is t or is contained in t *)
 let rec occur (t:Type.t) (var:Type.t) : bool =
-  let fold_fct acc x = (acc && (occur x var)) in
+  let fold_fct acc t = (acc || (occur t var)) in
     match t with
     | Unit | Int | Bool | Float -> false
-    | Fun (l, t3) -> (List.fold_left fold_fct false l) && (occur t3 var)
+    | Fun (l, t3) -> (List.fold_left fold_fct false l) || (occur t3 var)
     | Tuple l -> List.fold_left fold_fct false l
     | Array t3 -> occur t3 var
     | Var v -> Type.is_same t var
 
 
-(* solver equation system
- * uses unification algorithm
- *)
+(* equations system solver
+ * uses unification algorithm *)
+(* cf https://wackb.gricad-pages.univ-grenoble-alpes.fr/inf402/cours10_En.pdf slides 21 & 22 *)
 let rec resolution (el:equation list) : equation list =
-  let notunifiable = fun () -> failwith "not unifiable" in
   match el with
   | [] -> []
   | (t1,t2)::l ->
-    match t1,t2 with
-      (* Remove the equation *)
-      | Unit,Unit | Bool,Bool | Int,Int | Float,Float -> resolution l
+    if Type.is_same t1 t2 then resolution l (* Remove the useless equation *)
+    else
+      match t1,t2 with
 
       (* Decompose & failure of decomposition *)
-      | Fun (l1, t1), Fun (l2, t2) -> 
+      | Fun (l3, t3), Fun (l4, t4) -> 
         (try
-          let r = (t1,t2)::(List.map2 (fun x y -> (x,y)) l1 l2) 
+          let r = (t3,t4)::(List.map2 (fun x y -> (x,y)) l3 l4) 
             in resolution (r @ l)
-        with Invalid_argument e -> notunifiable ())
+        with Invalid_argument e -> failwith "not unifiable : failure of decomposition (function)")
       | Tuple l1, Tuple l2 ->
         (try let r = List.map2 (fun x y -> (x,y)) l1 l2
           in resolution (r @ l)
-        with Invalid_argument e -> notunifiable ())
-      | Array t1, Array t2 -> resolution ((t1,t2)::l)
+        with Invalid_argument e -> failwith "not unifiable : failure of decomposition (tuple)")
+      | Array t3, Array t4 -> resolution ((t3,t4)::l)
+
+      (* Elimination of variable & failure of elimination *)
+      | Var v,t ->
+        if not (occur t t1) then
+          let l3 = replace true l t1 t in (t1, t)::resolution l3
+        else failwith "not unifiable : failure of elimination"
 
       (* Orient *)
       | t,Var v -> resolution ((Var v, t)::l)
 
-      (* Elimination of variable & failure of elimination *)
-      | Var v,t ->
-        if not (occur t (Var v)) then
-          let l3 = replace true l (Var v) t in
-            (Var v, t)::resolution l3
-        else notunifiable ()
-
       (* Failure of decomposition *)
-      | _ -> notunifiable ()
+      | _ -> failwith "not unifiable : failure of decomposition"
 
 
-(* remove all Var on right member of equation by substitution *)
+(* remove Var on right member of equation by substitution *)
 let rec subsitution (eq:equation list) : equation list =
-  let temp = List.fold_left (fun l (t1, t2) -> replace false l t1 t2) eq eq in
-    temp
+  List.fold_left (fun l (t1, t2) -> replace false l t1 t2) eq eq
 
 
 (*************************
@@ -193,11 +216,9 @@ let rec subsitution (eq:equation list) : equation list =
 
 (* Set infered types on the ast  *)
 let rec set_types (eq:equation list) : unit =
-  match eq with
-  | [] -> ()
-  | (Var v, t2)::l -> v := Some (t2); set_types l
-  | _ -> failwith "non an solution list"
-  
+  let iter_fct eq =  (match eq with (Type.Var v, t2) -> v := Some (t2) | _ -> assert false) in
+    List.iter iter_fct eq
+
 
 (* Main function for type inference
  * -> generates type's equation
@@ -206,5 +227,7 @@ let rec set_types (eq:equation list) : unit =
  *)
 let type_check (ast:Syntax.t) : unit = 
   let eq = gen_equations ast predef Unit in
+    (* print_endline (to_string eq); *)
     let sub = subsitution (resolution eq) in
+      (* print_endline (to_string sub); *)
       set_types sub;
