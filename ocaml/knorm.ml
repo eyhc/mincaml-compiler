@@ -27,7 +27,7 @@ type knorm_t =
   | Let of (Id.t * Type.t) * knorm_t * knorm_t
   | LetRec of fundef * knorm_t
   | App of Id.t * Id.t list
-  | LetTuple of (Id.t * Type.t) list * Id.t list * knorm_t
+  | LetTuple of (Id.t * Type.t) list * Id.t * knorm_t
   | Tuple of Id.t list
   | Array of Id.t * Id.t
   | Get of Id.t * Id.t
@@ -123,14 +123,28 @@ let k_normalization (exp:Syntax.t) : knorm_t =
         (match Type.simplify t' with
         | Fun(l, t) ->
           insert_let (e',t') (fun x -> (insert_nx le (fun lx -> App(x,lx)))),t
-        | _ -> failwith "knormalisazion failed : App with non functional type")
+        | _ -> failwith "knormalization failed : App with non functional type")
 
-    | LetTuple (l, e1, e2) -> failwith "todo"
-    | Tuple l -> failwith "todo"
+    | LetTuple (l, e1, e2) -> 
+      let k,t = norm e2 (l @ env) in
+        (insert_let (norm e1 env) (fun x -> LetTuple(l, x, k))), t
+    | Tuple l -> insert_nx l (fun l -> Tuple l), Tuple (List.map (fun x -> snd (norm x env)) l)
 
-    | Array (e1, e2) -> failwith "todo"
-    | Get (e1, e2) -> failwith "todo"
-    | Put (e1, e2, e3) -> failwith "todo")
+    | Array (e1, e2) ->
+      let k2,t2 = norm e2 env in
+        insert_let (norm e1 env) (fun x -> insert_let (k2,t2) (fun y -> Array (x, y))),Array t2
+    | Get (e1, e2) -> 
+      let k1,t1 = norm e1 env in
+        (match Type.simplify t1 with
+        | Array t -> 
+          insert_let (k1,t1) (fun x -> insert_let (norm e2 env) (fun y -> Get(x, y))), t
+        | _ -> failwith "knormalization failed : Get of non array type")
+    | Put (e1, e2, e3) ->
+      let k1,t1 = norm e1 env in
+        (match Type.simplify t1 with
+        | Array t -> insert_let (k1,t1) (fun x -> insert_2x e2 e3 (fun y z -> Put(x, y, z))), t
+        | _ -> failwith "knormalization failed : Put of non array type")
+    )
   
   in let res,_ = norm exp Typechecker.predef in res
 
@@ -171,10 +185,10 @@ let rec to_string_rec (with_type:bool) (k:knorm_t) : string =
     (to_string_rec e)
   | App (id, l) -> sprintf "(%s %s)" 
     (Id.to_string id) (Syntax.infix_to_string Id.to_string l " ")
-  | LetTuple (args, values, e) -> sprintf "let (%s)%s = (%s) in \n%s"
+  | LetTuple (args, var, e) -> sprintf "let (%s)%s = %s in \n%s"
     (Syntax.infix_to_string (fun x -> Id.to_string (fst x)) args ",")
     (if with_type then ":tuple(" ^ (Syntax.infix_to_string (fun (_, y) -> Type.to_string2 y) args " ") ^ ")" else "")
-    (Syntax.infix_to_string Id.to_string values ",")
+    (Id.to_string var)
     (to_string_rec e)
   | Tuple values -> sprintf "(%s)" (Syntax.infix_to_string Id.to_string values ",")
   | Array (b1, b2) -> sprintf "(Array.create %s %s)" (Id.to_string b1) (Id.to_string b2)

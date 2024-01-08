@@ -64,11 +64,11 @@ let rec alpha_conversion (env:epsilon) (a:Knorm.knorm_t) : Knorm.knorm_t =
             let e2 = alpha_conversion ((fst fd.name, newname)::env) e in
               let args = List.map2 (fun (s1,t) s2 -> (s2,t)) fd.args newargs in
                 LetRec ({name = (newname, snd fd.name); args = args; body = newbody}, e2)
-  | LetTuple (l1, l2, e1) -> 
+  | LetTuple (l1, v, e1) -> 
     let l1' = List.map (fun x -> Id.make_unique (fst x)) l1 in
-        let env2 = (List.map2 (fun x y -> (fst x, y)) l1 l1') @ env in
-          let e12 = alpha_conversion env2 e1 in
-            LetTuple (List.map2 (fun (s1,t) s2 -> (s2,t)) l1 l1', List.map eps_apply l2, e12)
+      let env2 = (List.map2 (fun x y -> (fst x, y)) l1 l1') @ env in
+        let e12 = alpha_conversion env2 e1 in
+          LetTuple (List.map2 (fun (s1,t) s2 -> (s2,t)) l1 l1', eps_apply v, e12)
 
 
 (* Applying of alpha-conversion on ast *)
