@@ -98,7 +98,7 @@ let rec gen_equations (expr:Syntax.t) (env:environment) (wanted:Type.t) : equati
 
   | LetRec (fd, e) -> 
     let t = Type.gentyp () in
-      let eq1 = gen_equations fd.body (fd.args @ env) t in
+      let eq1 = gen_equations fd.body (fd.name::fd.args @ env) t in
         let ftype = Type.Fun(List.map snd fd.args, t) in
         let eq2 = gen_equations e ((fst fd.name, ftype)::env) wanted in
           (snd fd.name, ftype) :: eq1 @ eq2
