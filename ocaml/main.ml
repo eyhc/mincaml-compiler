@@ -101,9 +101,9 @@ let print_asml f =
     let ast = Knorm.k_normalization ast in   (* K-normalization *)
     let ast = Alpha.conversion ast in        (*  alpha-conversion *)
     let ast = Reduction.reduction ast in     (* reduction of nested-let *)
-    (*let ast = Closure.conversion ast in *)     (* closure conversion *)
+    let ast = Closure.closure ast in     (* closure conversion *)
     (*let asml = Asml. *)                        (* ASML generation *)
-    print_endline (Knorm.to_string ast)      (* Affichage *)
+    print_endline (Closure.to_string ast)      (* Affichage *)
 
 
 (* Compile code file f to arm (32?) *)

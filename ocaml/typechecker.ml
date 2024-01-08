@@ -22,6 +22,10 @@ let predef:environment = [
   ("print_float", Type.Fun ([Type.Float], Type.Unit))
 ]
 
+let rec is_prefef_fun f_name list =
+  match list with
+  | [] -> false
+  | f :: tail -> if (fst f) = f_name then true else is_prefef_fun f_name tail
 
 (************************
    EQUATIONS GENERATION
