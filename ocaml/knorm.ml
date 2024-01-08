@@ -1,37 +1,37 @@
-open Syntax
+(*
+knorm.ml
+
+date : 08-01-2023
+*)
+
 open Printf
 
-let ide x = x
+(* Le type knorm_t représente un ast k-normalisé
+ * -> All nested expressions are replaced by new fresh variables *)
+type knorm_t =
+  | Unit
+  | Var of Id.t
+  | Int of int
+  | Float of float
+  | Bool of bool
+  | Not of Id.t
+  | Neg of Id.t
+  | Add of Id.t * Id.t
+  | Sub of Id.t * Id.t
+  | FNeg of Id.t
+  | FAdd of Id.t * Id.t
+  | FSub of Id.t * Id.t
+  | FMul of Id.t * Id.t
+  | FDiv of Id.t * Id.t
+  | If of bool_op * knorm_t * knorm_t
+  | Let of (Id.t * Type.t) * knorm_t * knorm_t
+  | LetRec of fundef * knorm_t
+  | App of Id.t * Id.t list
+  | LetTuple of (Id.t * Type.t) list * Id.t list * knorm_t
+  | Tuple of Id.t list
+  | Array of Id.t * Id.t
+  | Get of Id.t * Id.t
+  | Put of Id.t * Id.t * Id.t
+and fundef = {name : Id.t * Type.t; args : (Id.t * Type.t) list; body : knorm_t }
+and bool_op = Eq of Id.t * Id.t | LE of Id.t * Id.t
 
-(* Insert a new let in the code and replace e with the new generated let *)
-let insert_let e k =
-  let name = Id.genid () in
-  let e' = k (Var(name)) in
-  Let((name, Int), e, e')
-
-
-(* let rec norm_args args k =
-  match args with
-  | [x] -> (match x with
-          | App(e1, le2) -> norm_args le2 (fun z -> k [App(e1, z)])
-          | _ -> insert_let x (fun y -> k [y]))
-  | head :: l -> insert_let head (fun x -> norm_args l (fun y -> k ([x]@y)) ) *)
-
-let k_normalization exp =
-  let rec norm e k =
-    match e with
-    | Var id -> insert_let e k
-    | Int i ->  insert_let e k
-    | Add(e1, e2) -> norm e1 (fun x -> norm e2 (fun y -> k (Add(x, y))))
-    | Sub(e1, e2) -> norm e1 (fun x -> norm e2 (fun y -> k (Sub(x, y))))
-    | Let((id, t), e1, e2) -> let k_e1 = norm e1 ide in Let((id, t), k_e1, 
-        match e2 with
-        | Var id -> e2
-        | _ -> norm e2 ide)
-    | LetRec(fd, e) -> let k_body = norm fd.body ide in LetRec({name = fd.name; args = fd.args; body = k_body}, 
-        match e with
-        | Var id -> e
-        | _ -> norm e ide)
-    (* | App (e1, le2) -> norm_args le2 (fun x -> App(e1, x)) *)
-    | _ -> e
-  in norm exp ide
