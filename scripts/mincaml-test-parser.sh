@@ -5,6 +5,7 @@ cd "$(dirname "$0")"/.. || exit 1
 # it to your PATH. Use the appropriate option to run the parser as soon
 # as it is implemented
 MINCAMLC=ocaml/mincamlc
+OPTION=-p
 
 # run all test cases in syntax/valid and make sure they are parsed without error
 # run all test cases in syntax/invalid and make sure the parser returns an error
@@ -15,7 +16,7 @@ MINCAMLC=ocaml/mincamlc
 for test_case in tests/syntax/valid/*.ml
 do
     echo "testing parser on: $test_case"
-    if $MINCAMLC "$test_case" 2> /dev/null 1> /dev/null
+    if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
     else 
@@ -26,7 +27,7 @@ done
 for test_case in tests/syntax/invalid/*.ml
 do
     echo "testing parser on: $test_case"
-    if $MINCAMLC "$test_case" 2> /dev/null 1> /dev/null
+    if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
     else 
