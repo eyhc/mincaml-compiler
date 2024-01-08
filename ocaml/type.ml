@@ -30,6 +30,17 @@ let rec is_same (x:t) (y:t) : bool =
       | Array t1, Array t2 -> is_same t1 t2
       | _ -> false
 
+let rec simplify (v:t) : t =
+  match v with
+  | Unit | Int | Bool | Float -> v
+  | Fun (l, t) -> Fun(List.map simplify l, simplify t)
+  | Tuple l -> Tuple (List.map simplify l)
+  | Array (u) -> Array (simplify u)
+  | Var u ->
+    (match !u with
+    | None -> Var u
+    | Some w -> simplify w)
+
 
 (* to string functions *)
 let rec infix_to_string (to_s : 'a -> string) (l : 'a list) (op : string) : string = 
@@ -44,14 +55,14 @@ let rec to_string (x:t) : string =
   | Bool -> "bool"
   | Int -> "int"
   | Float -> "float"
-  | Fun (l, t) -> Printf.sprintf "(%s-> %s)" (infix_to_string to_string l " ") (to_string t)
+  | Fun (l, t) -> Printf.sprintf "(%s -> %s)" (infix_to_string to_string l " ") (to_string t)
   | Tuple l -> Printf.sprintf "tuple(%s)" (infix_to_string to_string l " ")
   | Array t -> Printf.sprintf "array(%s)" (to_string t)
   | Var v -> Printf.sprintf "Var %d" ((Obj.magic v) mod 1000)
 
 let rec to_string2 (x:t) : string =
   match x with
-  | Fun (l, t) -> Printf.sprintf "(%s-> %s)" (infix_to_string to_string2 l " ") (to_string2 t)
+  | Fun (l, t) -> Printf.sprintf "(%s -> %s)" (infix_to_string to_string2 l " ") (to_string2 t)
   | Tuple l -> Printf.sprintf "tuple(%s)" (infix_to_string to_string2 l " ")
   | Array t -> Printf.sprintf "array(%s)" (to_string2 t)
   | Var v -> (

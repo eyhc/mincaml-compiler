@@ -56,26 +56,30 @@ let type_check_only f =
 
 (* Test compiler steps functions *)
 let print_knorm ast =
+  Typechecker.type_check ast;
   let res = Knorm.k_normalization ast in
-  print_endline (Syntax.to_string res)
+    print_endline (Knorm.to_string_with_type res)
 
 let print_alpha ast =
+  Typechecker.type_check ast;
   let res = Knorm.k_normalization ast in
     let res = Alpha.conversion res in
-    print_endline (Syntax.to_string res)
+    print_endline (Knorm.to_string res)
 
 let print_let_reduc ast =
+  Typechecker.type_check ast;
   let res = Knorm.k_normalization ast in
     let res = Alpha.conversion res in
       let res = Reduction.reduction res in
-      print_endline (Syntax.to_string res)
+      print_endline (Knorm.to_string res)
 
 let print_closure ast =
+  Typechecker.type_check ast(*;
   let res = Knorm.k_normalization ast in
     let res = Alpha.conversion res in
       let res = Reduction.reduction res in
         let res = Closure.conversion res in
-        print_endline (Closure.to_string res)
+        print_endline (Closure.to_string res)*)
 
 let print_test f =
   let ast = get_ast f in
@@ -97,31 +101,31 @@ let print_asml f =
     let ast = Knorm.k_normalization ast in   (* K-normalization *)
     let ast = Alpha.conversion ast in        (*  alpha-conversion *)
     let ast = Reduction.reduction ast in     (* reduction of nested-let *)
-    let ast = Closure.conversion ast in      (* closure conversion *)
-                                             (* ASML generation *)
-    print_endline (Closure.to_string ast)     (* Affichage *)
+    (*let ast = Closure.conversion ast in *)     (* closure conversion *)
+    (*let asml = Asml. *)                        (* ASML generation *)
+    print_endline (Knorm.to_string ast)      (* Affichage *)
 
 
+(* Compile code file f to arm (32?) *)
 let main (inp:string) (out:string) : unit = 
   print_endline "compilation.... todo"
 
 
-
 (* MAIN *)
 let () = 
-      Arg.parse speclist (fun x -> input := x) usage_msg;
+  Arg.parse speclist (fun x -> input := x) usage_msg;
 
-      if String.length !input = 0 then
-        show_help 1
-      else if !parse_only then
-        print_ast !input
-      else if !type_only then
-        type_check_only !input
-      else if !asml_only then
-        print_asml !input
-      else if !test then
-        print_test !input
-      else if String.length !output = 0 then
-        show_help 1
-      else
-        main !input !output
+  if String.length !input = 0 then
+    show_help 1
+  else if !parse_only then
+    print_ast !input
+  else if !type_only then
+    type_check_only !input
+  else if !asml_only then
+    print_asml !input
+  else if !test then
+    print_test !input
+  else if String.length !output = 0 then
+    show_help 1
+  else
+    main !input !output
