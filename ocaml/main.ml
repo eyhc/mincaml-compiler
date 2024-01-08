@@ -74,12 +74,12 @@ let print_let_reduc ast =
       print_endline (Knorm.to_string res)
 
 let print_closure ast =
-  Typechecker.type_check ast(*;
+  Typechecker.type_check ast;
   let res = Knorm.k_normalization ast in
     let res = Alpha.conversion res in
       let res = Reduction.reduction res in
-        let res = Closure.conversion res in
-        print_endline (Closure.to_string res)*)
+        let res = Closure.closure res in
+        print_endline (Closure.to_string res)
 
 let print_test f =
   let ast = get_ast f in
@@ -101,9 +101,9 @@ let print_asml f =
     let ast = Knorm.k_normalization ast in   (* K-normalization *)
     let ast = Alpha.conversion ast in        (*  alpha-conversion *)
     let ast = Reduction.reduction ast in     (* reduction of nested-let *)
-    let ast = Closure.closure ast in     (* closure conversion *)
-    (*let asml = Asml. *)                        (* ASML generation *)
-    print_endline (Closure.to_string ast)      (* Affichage *)
+    let ast = Closure.closure ast in         (* closure conversion *)
+    let asml = Asml.generation ast in        (* ASML generation *)
+    print_endline (Asml.to_string asml)    (* Affichage *)
 
 
 (* Compile code file f to arm (32?) *)

@@ -23,7 +23,9 @@ type knorm_t =
   | FSub of Id.t * Id.t
   | FMul of Id.t * Id.t
   | FDiv of Id.t * Id.t
-  | If of bool_op * knorm_t * knorm_t
+  | Eq of Id.t * Id.t 
+  | LE of Id.t * Id.t
+  | If of Id.t * knorm_t * knorm_t
   | Let of (Id.t * Type.t) * knorm_t * knorm_t
   | LetRec of fundef * knorm_t
   | App of Id.t * Id.t list
@@ -33,7 +35,6 @@ type knorm_t =
   | Get of Id.t * Id.t
   | Put of Id.t * Id.t * Id.t
 and fundef = {name : Id.t * Type.t; args : (Id.t * Type.t) list; body : knorm_t }
-and bool_op = Eq of Id.t * Id.t | LE of Id.t * Id.t
 
 
 (* insertion d'une expression let si besoin
@@ -95,19 +96,11 @@ let k_normalization (exp:Syntax.t) : knorm_t =
     | FDiv (e1, e2) -> (insert_2x e1 e2 (fun x y -> FDiv (x,y))), Float
 
     | Not e -> (insert_let (norm e env) (fun x -> Not x)), Bool
-    | Eq (e1, e2) -> norm (If(exp, Bool true, Bool false)) env
-    | LE (e1, e2) -> norm (If(exp, Bool true, Bool false)) env
-    | If (e1, e2, e3) -> (
-      match e1 with
-      | Not e -> norm (If(e, e3, e2)) env
-      | Eq (e, e') ->
-        let (k2,_) = norm e2 env and (k3,t) = norm e3 env in
-          (insert_2x e e' (fun x y -> If(Eq(x, y), k2, k3))), t
-      | LE (e, e') -> 
-        let (k2,_) = norm e2 env and (k3,t) = norm e3 env in
-          (insert_2x e e' (fun x y -> If(LE(x, y), k2, k3))), t
-      | _ -> norm (If (Eq (e1, Bool false), e3, e2)) env
-    )
+    | Eq (e1, e2) -> (insert_2x e1 e2 (fun x y -> Eq (x,y))), Bool
+    | LE (e1, e2) -> (insert_2x e1 e2 (fun x y -> LE (x,y))), Bool
+    | If (e1, e2, e3) -> 
+      let (k2,_) = norm e2 env and (k3,t) = norm e3 env in
+        (insert_let (norm e1 env) (fun x -> If(x, k2, k3))), t
 
     | Let (id, e1 , e2) ->
       let (k1, t1) = norm e1 env in
@@ -115,8 +108,9 @@ let k_normalization (exp:Syntax.t) : knorm_t =
           Let(id, k1, k2), t2
 
     | LetRec (fd, e) -> 
-      let e1,t1 = norm fd.body (fd.args @ env) in
+      let e1,t1 = norm fd.body (fd.name::fd.args @ env) in
         let e2,t2 = norm e (fd.name::env) in
+        let _ = Printf.printf "toto : %s\n" (Syntax.infix_to_string (fun (x,y) -> Id.to_string x) (fd.name::fd.args @ env) " " ) in
           LetRec ({name = fd.name; args = fd.args; body = e1}, e2), t2
     | App (e, le) ->
       let (e',t') = norm e env in
@@ -150,17 +144,14 @@ let k_normalization (exp:Syntax.t) : knorm_t =
 
 
 (* fonctions to_string : dans l'idée de Syntax.to_string *)
-let boolop_to_string (x:bool_op) : string =
-  match x with
-  | Eq (b1, b2) -> sprintf "%s = %s" (Id.to_string b1) (Id.to_string b2)
-  | LE (b1, b2) -> sprintf "%s <= %s" (Id.to_string b1) (Id.to_string b2)
-
 let rec to_string_rec (with_type:bool) (k:knorm_t) : string =
   let to_string_rec = to_string_rec with_type in
   match k with
   | Var b -> Id.to_string b
   | Unit -> "()"
   | Bool b -> if b then "true" else "false"
+  | Eq (x,y) -> sprintf "(%s = %s)" (Id.to_string x) (Id.to_string y) 
+  | LE (x,y) -> sprintf "(%s <= %s)" (Id.to_string x) (Id.to_string y) 
   | Int i -> string_of_int i
   | Float f -> sprintf "%.2f" f
   | Not b -> sprintf "(not %s)" (Id.to_string b)
@@ -173,7 +164,7 @@ let rec to_string_rec (with_type:bool) (k:knorm_t) : string =
   | FMul (b1, b2) -> sprintf "(%s *. %s)" (Id.to_string b1) (Id.to_string b2)
   | FDiv (b1, b2) -> sprintf "(%s /. %s)" (Id.to_string b1) (Id.to_string b2)
   | If (b, k1, k2) -> sprintf "(if %s then %s else %s)" 
-    (boolop_to_string b) (to_string_rec k1) (to_string_rec k2)
+    (Id.to_string b) (to_string_rec k1) (to_string_rec k2)
   | Let ((id,t), k1, k2) -> sprintf "(let %s%s = %s in \n%s)"
     (Id.to_string id) (if with_type then ":"^Type.to_string2 t else "")
     (to_string_rec k1) (to_string_rec k2)

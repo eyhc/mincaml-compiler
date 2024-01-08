@@ -1,7 +1,7 @@
 (*
 alpha.ml
 
-date : 21-12-2023
+date : 08-01-2023
 *)
 
 (* epsilon is the mapping between old and new variable's name *)
@@ -29,6 +29,8 @@ let rec alpha_conversion (env:epsilon) (a:Knorm.knorm_t) : Knorm.knorm_t =
 
   (* no recursive calls *)
   | Not x -> Not (eps_apply x)
+  | Eq (x, y) -> Eq (eps_apply x, eps_apply y)
+  | LE (x, y) -> LE (eps_apply x, eps_apply y)
   | Neg x -> Neg (eps_apply x)
   | Add (x, y) -> Add (eps_apply x, eps_apply y)
   | Sub (x, y) -> Sub (eps_apply x, eps_apply y)
@@ -45,10 +47,8 @@ let rec alpha_conversion (env:epsilon) (a:Knorm.knorm_t) : Knorm.knorm_t =
 
   (* with recursive calls *)
   | If (b,e1,e2) -> 
-    let e12 = alpha_conversion env e1 and e22 = alpha_conversion env e2 in(
-      match b with
-      | Eq (x, y) -> If (Eq (eps_apply x, eps_apply y), e12, e22)
-      | LE (x, y) -> If (LE (eps_apply x, eps_apply y), e12, e22))
+    let e12 = alpha_conversion env e1 and e22 = alpha_conversion env e2 in
+      If (eps_apply b, e12, e22)
 
   (* Creates new fresh variables and changes epsilon mapping *)
   | Let ((s,t), e1, e2) -> 
@@ -59,7 +59,7 @@ let rec alpha_conversion (env:epsilon) (a:Knorm.knorm_t) : Knorm.knorm_t =
   | LetRec (fd, e) ->
     let newname = Id.make_unique (fst fd.name) in
       let newargs = List.map (fun x -> Id.make_unique (fst x)) fd.args in
-        let env2 = (List.map2 (fun x y -> (fst x,y)) fd.args newargs) @ env in
+        let env2 = (fst fd.name, newname)::(List.map2 (fun x y -> (fst x,y)) fd.args newargs) @ env in
           let newbody = alpha_conversion env2 fd.body in
             let e2 = alpha_conversion ((fst fd.name, newname)::env) e in
               let args = List.map2 (fun (s1,t) s2 -> (s2,t)) fd.args newargs in
@@ -69,7 +69,6 @@ let rec alpha_conversion (env:epsilon) (a:Knorm.knorm_t) : Knorm.knorm_t =
       let env2 = (List.map2 (fun x y -> (fst x, y)) l1 l1') @ env in
         let e12 = alpha_conversion env2 e1 in
           LetTuple (List.map2 (fun (s1,t) s2 -> (s2,t)) l1 l1', eps_apply v, e12)
-
 
 (* Applying of alpha-conversion on ast *)
 (* The given ast MUST BE in k-normal form *)
