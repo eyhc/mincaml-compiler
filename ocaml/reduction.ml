@@ -11,7 +11,8 @@ open Knorm
 (* AST MUST BE IN K-NORMAL FORM ! *)
 let rec reduction (ast_norm:knorm_t) : knorm_t =
   match ast_norm with
-  | If (b, e2, e3) -> If (b, reduction e2, reduction e3)
+  | IfEq (b, e2, e3) -> IfEq (b, reduction e2, reduction e3)
+  | IfLE (b, e2, e3) -> IfLE (b, reduction e2, reduction e3)
   | Let (x, e1, e2) -> 
     let rec insert =
       (function

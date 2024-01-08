@@ -22,15 +22,11 @@ let rec alpha_conversion (env:epsilon) (a:Knorm.knorm_t) : Knorm.knorm_t =
   | Unit -> a
   | Int i -> a
   | Float f -> a
-  | Bool b -> a
 
   (* find in environment *)
   | Var s -> Var (eps_apply s)
 
   (* no recursive calls *)
-  | Not x -> Not (eps_apply x)
-  | Eq (x, y) -> Eq (eps_apply x, eps_apply y)
-  | LE (x, y) -> LE (eps_apply x, eps_apply y)
   | Neg x -> Neg (eps_apply x)
   | Add (x, y) -> Add (eps_apply x, eps_apply y)
   | Sub (x, y) -> Sub (eps_apply x, eps_apply y)
@@ -46,9 +42,12 @@ let rec alpha_conversion (env:epsilon) (a:Knorm.knorm_t) : Knorm.knorm_t =
   | Array(x,y) -> Array (eps_apply x, eps_apply y)
 
   (* with recursive calls *)
-  | If (b,e1,e2) -> 
+  | IfEq ((x,y),e1,e2) -> 
     let e12 = alpha_conversion env e1 and e22 = alpha_conversion env e2 in
-      If (eps_apply b, e12, e22)
+      IfEq ((eps_apply x, eps_apply y), e12, e22)
+  | IfLE ((x,y),e1,e2) -> 
+    let e12 = alpha_conversion env e1 and e22 = alpha_conversion env e2 in
+      IfLE ((eps_apply x, eps_apply y), e12, e22)
 
   (* Creates new fresh variables and changes epsilon mapping *)
   | Let ((s,t), e1, e2) -> 

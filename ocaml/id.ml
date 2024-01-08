@@ -7,7 +7,7 @@ let genid =
   let counter = ref (0) in
   fun () ->
     incr counter;
-    Printf.sprintf "?v%d" !counter
+    Printf.sprintf "_v%d" !counter
 let genlabel =
   let counter = ref (0) in
   fun () ->
@@ -17,7 +17,6 @@ let genlabel =
 let make_unique =
   let counter = ref (0) in
   fun (name:t) : t ->
-    let car = String.get name 0 in
-      if car = '?' || car = '$' then name
-      else 
-        let _ = incr counter in Printf.sprintf "$%s%d" name !counter
+    if String.get name 0 = '_' then name
+    else 
+      let _ = incr counter in Printf.sprintf "%s%d" name !counter

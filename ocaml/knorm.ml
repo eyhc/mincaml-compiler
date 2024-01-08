@@ -13,8 +13,6 @@ type knorm_t =
   | Var of Id.t
   | Int of int
   | Float of float
-  | Bool of bool
-  | Not of Id.t
   | Neg of Id.t
   | Add of Id.t * Id.t
   | Sub of Id.t * Id.t
@@ -23,9 +21,8 @@ type knorm_t =
   | FSub of Id.t * Id.t
   | FMul of Id.t * Id.t
   | FDiv of Id.t * Id.t
-  | Eq of Id.t * Id.t 
-  | LE of Id.t * Id.t
-  | If of Id.t * knorm_t * knorm_t
+  | IfEq of (Id.t * Id.t)  * knorm_t * knorm_t
+  | IfLE of (Id.t * Id.t)  * knorm_t * knorm_t
   | Let of (Id.t * Type.t) * knorm_t * knorm_t
   | LetRec of fundef * knorm_t
   | App of Id.t * Id.t list
@@ -78,12 +75,12 @@ let k_normalization (exp:Syntax.t) : knorm_t =
     | Unit -> Unit, Unit
     | Int i -> Int i, Int
     | Float f -> Float f, Float
-    | Bool b -> Bool b, Bool
+    | Bool b -> Int (Bool.to_int b), Int
 
     | Var id -> Var id,
-      (try 
+      (try
         (snd (List.find (fun (x,y) -> x = id) env))
-      with Not_found -> failwith (Printf.sprintf "Knorm failed -> Not found : %s" id))
+      with Not_found -> failwith (sprintf "Knorm failed -> Not found : %s" id))
 
     | Add (e1, e2) -> (insert_2x e1 e2 (fun x y -> Add (x,y))), Int
     | Sub (e1, e2) -> (insert_2x e1 e2 (fun x y -> Sub (x,y))), Int
@@ -95,12 +92,19 @@ let k_normalization (exp:Syntax.t) : knorm_t =
     | FMul (e1, e2) -> (insert_2x e1 e2 (fun x y -> FMul (x,y))), Float
     | FDiv (e1, e2) -> (insert_2x e1 e2 (fun x y -> FDiv (x,y))), Float
 
-    | Not e -> (insert_let (norm e env) (fun x -> Not x)), Bool
-    | Eq (e1, e2) -> (insert_2x e1 e2 (fun x y -> Eq (x,y))), Bool
-    | LE (e1, e2) -> (insert_2x e1 e2 (fun x y -> LE (x,y))), Bool
+    | Not e -> norm (If (Eq(e, Bool true), Bool false, Bool true)) env
+    | Eq (e1, e2) -> norm (If(exp, Bool true, Bool false)) env
+    | LE (e1, e2) -> norm (If(exp, Bool true, Bool false)) env
     | If (e1, e2, e3) -> 
-      let (k2,_) = norm e2 env and (k3,t) = norm e3 env in
-        (insert_let (norm e1 env) (fun x -> If(x, k2, k3))), t
+      (match e1 with
+      | Not x -> norm (If(x, e3, e2)) env
+      | Eq (e11, e12) -> 
+        let k2,_ = norm e2 env and k3,t = norm e3 env in 
+          insert_2x e11 e12 (fun x y -> IfEq((x,y), k2, k3)),t
+      | LE (e11, e12) ->
+        let k2,_ = norm e2 env and k3,t = norm e3 env in 
+          insert_2x e11 e12 (fun x y -> IfEq((x,y), k2, k3)),t
+      | _ -> norm (If (Eq (e1, Bool false), e3, e2)) env)
 
     | Let (id, e1 , e2) ->
       let (k1, t1) = norm e1 env in
@@ -110,7 +114,6 @@ let k_normalization (exp:Syntax.t) : knorm_t =
     | LetRec (fd, e) -> 
       let e1,t1 = norm fd.body (fd.name::fd.args @ env) in
         let e2,t2 = norm e (fd.name::env) in
-        let _ = Printf.printf "toto : %s\n" (Syntax.infix_to_string (fun (x,y) -> Id.to_string x) (fd.name::fd.args @ env) " " ) in
           LetRec ({name = fd.name; args = fd.args; body = e1}, e2), t2
     | App (e, le) ->
       let (e',t') = norm e env in
@@ -149,12 +152,8 @@ let rec to_string_rec (with_type:bool) (k:knorm_t) : string =
   match k with
   | Var b -> Id.to_string b
   | Unit -> "()"
-  | Bool b -> if b then "true" else "false"
-  | Eq (x,y) -> sprintf "(%s = %s)" (Id.to_string x) (Id.to_string y) 
-  | LE (x,y) -> sprintf "(%s <= %s)" (Id.to_string x) (Id.to_string y) 
   | Int i -> string_of_int i
   | Float f -> sprintf "%.2f" f
-  | Not b -> sprintf "(not %s)" (Id.to_string b)
   | Neg b -> sprintf "(- %s)" (Id.to_string b)
   | Add (b1, b2) -> sprintf "(%s + %s)" (Id.to_string b1) (Id.to_string b2)
   | Sub (b1, b2) -> sprintf "(%s - %s)" (Id.to_string b1) (Id.to_string b2)
@@ -163,8 +162,10 @@ let rec to_string_rec (with_type:bool) (k:knorm_t) : string =
   | FSub (b1, b2) -> sprintf "(%s -. %s)" (Id.to_string b1) (Id.to_string b2)
   | FMul (b1, b2) -> sprintf "(%s *. %s)" (Id.to_string b1) (Id.to_string b2)
   | FDiv (b1, b2) -> sprintf "(%s /. %s)" (Id.to_string b1) (Id.to_string b2)
-  | If (b, k1, k2) -> sprintf "(if %s then %s else %s)" 
-    (Id.to_string b) (to_string_rec k1) (to_string_rec k2)
+  | IfEq ((x, y), k1, k2) -> sprintf "(if %s = %s then %s \nelse %s)" 
+    (Id.to_string x) (Id.to_string y) (to_string_rec k1) (to_string_rec k2)
+  | IfLE ((x, y), k1, k2) -> sprintf "(if %s <= %s then %s \nelse %s)" 
+    (Id.to_string x) (Id.to_string y) (to_string_rec k1) (to_string_rec k2)
   | Let ((id,t), k1, k2) -> sprintf "(let %s%s = %s in \n%s)"
     (Id.to_string id) (if with_type then ":"^Type.to_string2 t else "")
     (to_string_rec k1) (to_string_rec k2)
