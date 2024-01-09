@@ -5,16 +5,23 @@ MINCAMLC=ocaml/mincamlc
 ASML=tools/asml
 OPTION=-asml
 
-# run one test case for each iteration in gen-code and make sure the asml code generated is correct
+# clean the generated asml files and results files
+rm tests/gen-code/*.asml 2> /dev/null 1> /dev/null
+rm tests/gen-code/*.actual 2> /dev/null 1> /dev/null
 
-echo "TESTING FRONT-END PASSES TO ASML GENERATION"
+# run one test case for each iteration in gen-code and make sure the asml code generated is correct and give the expected result
+echo "---------- TESTING FRONT-END PASSES TO ASML GENERATION ----------"
 echo "for Iteration 1 : arithmetic operations"
-test_case=tests/gen-code/test_simple_addition.ml
+test_case=tests/gen-code/simple_addition.ml
+asml_generated=tests/gen-code/simple_addition.asml
+result=tests/gen-code/simple_addition_asml.actual
+expected=tests/gen-code/simple_addition_asml.expected
 echo "testing compiler on: $test_case"
-echo $($MINCAMLC $OPTION "$test_case") 2> tests/gen-code/test_asml_simple_addition.asml 1> tests/gen-code/test_asml_simple_addition.asml
-echo $($ASML -v tests/gen-code/test_asml_simple_addition.asml) 2> tests/gen-code/test_asml_simple_addition.actual 1> tests/gen-code/test_asml_simple_addition.actual
-echo $(diff -s tests/gen-code/test_asml_simple_addition.actual tests/gen-code/test_asml_simple_addition.expected)
-if diff -s tests/gen-code/test_asml_simple_addition.actual tests/gen-code/test_asml_simple_addition.expected 2> /dev/null 1> /dev/null
+echo "Nothing to print" > $result
+echo $($MINCAMLC $OPTION "$test_case") 2> $asml_generated 1> $asml_generated
+echo $($ASML "$asml_generated") 2> $result 1> $result
+echo $(diff -s "$result" "$expected")
+if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
     then 
         echo "OK"
     else
@@ -22,12 +29,15 @@ if diff -s tests/gen-code/test_asml_simple_addition.actual tests/gen-code/test_a
 fi
 
 echo "\nfor Iteration 2 : call to external functions"
-test_case=tests/gen-code/test_call_to_print_int.ml
+test_case=tests/gen-code/call_to_print_int.ml
+asml_generated=tests/gen-code/call_to_print_int.asml
+result=tests/gen-code/call_to_print_int_asml.actual
+expected=tests/gen-code/call_to_print_int_asml.expected
 echo "testing compiler on: $test_case"
-echo $($MINCAMLC $OPTION "$test_case") 2> tests/gen-code/test_asml_call_to_print_int.asml 1> tests/gen-code/test_asml_call_to_print_int.asml
-echo $($ASML tests/gen-code/test_asml_simple_addition.asml) 2> tests/gen-code/test_asml_simple_addition.actual 1> tests/gen-code/test_asml_simple_addition.actual
-echo $(diff -s tests/gen-code/test_asml_call_to_print_int.actual tests/gen-code/test_asml_call_to_print_int.expected)
-if diff -s tests/gen-code/test_asml_call_to_print_int.actual tests/gen-code/test_asml_call_to_print_int.expected 2> /dev/null 1> /dev/null
+echo $($MINCAMLC $OPTION "$test_case") 2> $asml_generated 1> $asml_generated
+echo $($ASML "$asml_generated") 2> $result 1> $result
+echo $(diff -s "$result" "$expected")
+if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
     then 
         echo "OK"
     else
@@ -35,14 +45,98 @@ if diff -s tests/gen-code/test_asml_call_to_print_int.actual tests/gen-code/test
 fi
 
 echo "\nfor Iteration 3 : if_then_else"
-test_case=tests/gen-code/test_if_then_else.ml
+test_case=tests/gen-code/if_then_else.ml
+asml_generated=tests/gen-code/if_then_else.asml
+result=tests/gen-code/if_then_else_asml.actual
+expected=tests/gen-code/if_then_else_asml.expected
 echo "testing compiler on: $test_case"
-echo $($MINCAMLC $OPTION "$test_case") 2> tests/gen-code/test_asml_if_then_else.asml 1> tests/gen-code/test_asml_if_then_else.asml
-echo $($ASML -v tests/gen-code/test_asml_simple_addition.asml) 2> tests/gen-code/test_asml_simple_addition.actual 1> tests/gen-code/test_asml_simple_addition.actual
-echo $(diff -s tests/gen-code/test_asml_if_then_else.actual tests/gen-code/test_asml_if_then_else.expected)
-if diff -s tests/gen-code/test_asml_if_then_else.actual tests/gen-code/test_asml_if_then_else.expected 2> /dev/null 1> /dev/null
+echo $($MINCAMLC $OPTION "$test_case") 2> $asml_generated 1> $asml_generated
+echo $($ASML "$asml_generated") 2> $result 1> $result
+echo $(diff -s "$result" "$expected")
+if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
     then 
         echo "OK"
     else
         echo "KO"
 fi
+
+echo "\nfor Iteration 4 : functions"
+test_case=tests/gen-code/definition_function.ml
+asml_generated=tests/gen-code/definition_function.asml
+result=tests/gen-code/definition_function_asml.actual
+expected=tests/gen-code/definition_function_asml.expected
+echo "testing compiler on: $test_case"
+echo $($MINCAMLC $OPTION "$test_case") 2> $asml_generated 1> $asml_generated
+echo $($ASML "$asml_generated") 2> $result 1> $result
+echo $(diff -s "$result" "$expected")
+if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
+    then 
+        echo "OK"
+    else
+        echo "KO"
+fi
+
+echo "\nfor Iteration 5 : arrays and tuples"
+test_case=tests/gen-code/manipulate_tuple.ml
+asml_generated=tests/gen-code/manipulate_tuple.asml
+result=tests/gen-code/manipulate_tuple_asml.actual
+expected=tests/gen-code/manipulate_tuple_asml.expected
+echo "testing compiler on: $test_case"
+echo $($MINCAMLC $OPTION "$test_case") 2> $asml_generated 1> $asml_generated
+echo $($ASML "$asml_generated") 2> $result 1> $result
+echo $(diff -s "$result" "$expected")
+if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
+    then 
+        echo "OK"
+    else
+        echo "KO"
+fi
+
+test_case=tests/gen-code/change_value_in_array.ml
+asml_generated=tests/gen-code/change_value_in_array.asml
+result=tests/gen-code/change_value_in_array_asml.actual
+expected=tests/gen-code/change_value_in_array_asml.expected
+echo "testing compiler on: $test_case"
+echo $($MINCAMLC $OPTION "$test_case") 2> $asml_generated 1> $asml_generated
+echo $($ASML "$asml_generated") 2> $result 1> $result
+echo $(diff -s "$result" "$expected")
+if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
+    then 
+        echo "OK"
+    else
+        echo "KO"
+fi
+
+echo "\nfor Iteration 6 : closure"
+test_case=tests/gen-code/closure.ml
+asml_generated=tests/gen-code/closure.asml
+result=tests/gen-code/closure_asml.actual
+expected=tests/gen-code/closure_asml.expected
+echo "testing compiler on: $test_case"
+echo $($MINCAMLC $OPTION "$test_case") 2> $asml_generated 1> $asml_generated
+echo $($ASML "$asml_generated") 2> $result 1> $result
+echo $(diff -s "$result" "$expected")
+if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
+    then 
+        echo "OK"
+    else
+        echo "KO"
+fi
+
+echo "\nfor Iteration 7 : floats"
+test_case=tests/gen-code/float_tab.ml
+asml_generated=tests/gen-code/float_tab.asml
+result=tests/gen-code/float_tab_asml.actual
+expected=tests/gen-code/float_tab_asml.expected
+echo "testing compiler on: $test_case"
+echo $($MINCAMLC $OPTION "$test_case") 2> $asml_generated 1> $asml_generated
+echo $($ASML "$asml_generated") 2> $result 1> $result
+echo $(diff -s "$result" "$expected")
+if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
+    then 
+        echo "OK"
+    else
+        echo "KO"
+fi
+
+echo "---------- END TESTING ----------\n"

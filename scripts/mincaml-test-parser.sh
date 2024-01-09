@@ -12,7 +12,7 @@ OPTION=-p
 
 # TODO extends this script to run test in subdirectories
 # 
-
+echo "---------- TESTING PARSER ----------"
 for test_case in tests/syntax/valid/*.ml
 do
     echo "testing parser on: $test_case"
@@ -35,3 +35,4 @@ do
     fi
 done
 
+echo "---------- END TESTING ----------\n"

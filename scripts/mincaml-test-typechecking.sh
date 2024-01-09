@@ -6,7 +6,7 @@ OPTION=-t
 
 # run all test cases in typechecking/valid and make sure they are typechecked without error
 # run all test cases in typechecking/invalid and make sure the compiler returns an error
- 
+echo "---------- TESTING TYPECHECKER ----------"
 echo "SIMPLES TYPECHECKING"
 for test_case in tests/typechecking/valid/*.ml
 do
@@ -197,3 +197,5 @@ do
         echo "KO"
     fi
 done
+
+echo "---------- END TESTING ----------\n"
