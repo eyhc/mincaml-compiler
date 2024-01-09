@@ -32,7 +32,6 @@ type expr =
 | MEMASSIGN of Id.t * id_or_imm * Id.t
 | IFEQ of (Id.t*id_or_imm) * asmt * asmt
 | IFLE of (Id.t*id_or_imm) * asmt * asmt
-| IFGE of (Id.t*id_or_imm) * asmt * asmt
 | IFFEQUAL of (Id.t*Id.t) * asmt * asmt
 | IFFLE of (Id.t*Id.t) * asmt * asmt
 | CALL of Id.l * Id.t list
@@ -51,10 +50,10 @@ and asml = letdef list
   Generation functions
 ************************)
 
-let call_print_int x = CALL ("_min_caml_print_int", [x])
-let call_print_float x = CALL ("_min_caml_print_float", [x])
+let call_print_int x = CALL ("_min_caml_print_int", x)
+let call_print_float x = CALL ("_min_caml_print_float", x)
 
-let generation_expr (a:Closure.t) : expr =
+let rec generation_expr (a:Closure.t) : expr =
  match a with
  | Unit -> NOP
  | Int i -> VAL (Const i)
@@ -64,19 +63,31 @@ let generation_expr (a:Closure.t) : expr =
  | Add (x, y) -> ADD (x, Var y)
  | Sub (x, y) -> SUB (x, Var y)
 
- | Apply (f, args) -> failwith "todo"
- | Apply_Predef(f, args) -> failwith "todo"
- | _ -> assert false
+  | IfEq ((x,y), at1, at2) -> 
+    IFEQ((x, Var y), generation_asmt at1, generation_asmt at2)
+  | IfLE ((x,y), at1, at2) ->
+    IFLE((x, Var y), generation_asmt at1, generation_asmt at2)
+  | ApplyPredef (f, vars) ->
+    (match f with 
+    | "print_int" -> call_print_int vars
+    | "print_float" -> call_print_float vars
+    | _ -> failwith (sprintf "asml generation : unknown predef funct. : %s" f))
 
-let rec generation_asmt (a:Closure.t) : asmt = 
+(* | MakeClosure of Id.t * Id.t list
+|    ApplyDirect of Id.t * Id.t list
+ *)
+  | _ -> assert false
+
+
+and generation_asmt (a:Closure.t) : asmt = 
  match a with
  | Let (x, e1, e2) -> LET(x, generation_expr e1, generation_asmt e2)
  | _ -> EXP (generation_expr a)
 
 let rec generation_letdef (a:Closure.t) : letdef =
  match a with
- | Fun fd -> LetLabel (fd.label, fd.args, generation_asmt fd.body)
- | _ -> failwith "todo1"
+ | LetRec fd -> LetLabel (fd.label, fd.args, generation_asmt fd.body)
+ | _ -> failwith "todo letdef"
 
 let rec generation (ast:Closure.t) : asml = 
  match ast with
@@ -115,9 +126,6 @@ let rec to_string_exp (e:expr) =
  | IFLE ((v, vd), a1, a2) ->
    let sa1 = to_string_asmt a1 and sa2 = to_string_asmt a2 in
      sprintf "(if %s <= %s then\n%s\nelse\n%s)" (Id.to_string v) (to_string_id_imm vd) sa1 sa2
- | IFGE ((v, vd), a1, a2) ->
-   let sa1 = to_string_asmt a1 and sa2 = to_string_asmt a2 in
-     sprintf "(if %s >= %s then\n%s\nelse\n%s)" (Id.to_string v) (to_string_id_imm vd) sa1 sa2
  | IFFEQUAL ((v, v2), a1, a2) ->
    let sa1 = to_string_asmt a1 and sa2 = to_string_asmt a2 in
      sprintf "(if %s =. %s then\n%s\nelse\n%s)" (Id.to_string v) (Id.to_string v2) sa1 sa2

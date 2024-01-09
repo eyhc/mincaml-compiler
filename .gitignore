@@ -3,4 +3,4 @@ ocaml/min.ml
 ocaml/.vscode/
 ocaml/_build/
 .vscode
-ocaml/*.mml
+*/*.mml
