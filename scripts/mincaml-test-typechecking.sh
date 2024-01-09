@@ -4,6 +4,10 @@ cd "$(dirname "$0")"/.. || exit 1
 MINCAMLC=ocaml/mincamlc
 OPTION=-t
 
+# variables to count the number of passed and failed tests
+passed=0
+failed=0
+
 # run all test cases in typechecking/valid and make sure they are typechecked without error
 # run all test cases in typechecking/invalid and make sure the compiler returns an error
 echo "---------- TESTING TYPECHECKER ----------"
@@ -14,8 +18,10 @@ do
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
+        passed=$((passed+1))
     else 
         echo "KO"
+        failed=$((failed+1))
     fi
 done
 
@@ -25,8 +31,10 @@ do
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
+        failed=$((failed+1))
     else 
         echo "KO"
+        passed=$((passed+1))
     fi
 done
 
@@ -37,9 +45,11 @@ do
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
+        passed=$((passed+1))
     else 
         echo "KO"
         echo $($MINCAMLC $OPTION "$test_case")
+        failed=$((failed+1))
     fi
 done
 
@@ -49,8 +59,10 @@ do
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
+        failed=$((failed+1))
     else 
         echo "KO"
+        passed=$((passed+1))
     fi
 done
 
@@ -61,9 +73,11 @@ do
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
+        passed=$((passed+1))
     else 
         echo "KO"
         echo $($MINCAMLC $OPTION "$test_case")
+        failed=$((failed+1))
     fi
 done
 
@@ -73,8 +87,10 @@ do
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
+        failed=$((failed+1))
     else 
         echo "KO"
+        passed=$((passed+1))
     fi
 done
 
@@ -85,9 +101,11 @@ do
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
+        passed=$((passed+1))
     else 
         echo "KO"
         echo $($MINCAMLC $OPTION "$test_case")
+        failed=$((failed+1))
     fi
 done
 
@@ -97,8 +115,10 @@ do
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
+        failed=$((failed+1))
     else 
         echo "KO"
+        passed=$((passed+1))
     fi
 done
 
@@ -109,9 +129,11 @@ do
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
+        passed=$((passed+1))
     else 
         echo "KO"
         $($MINCAMLC $OPTION "$test_case")
+        failed=$((failed+1))
     fi
 done
 
@@ -121,8 +143,10 @@ do
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
+        failed=$((failed+1))
     else 
         echo "KO"
+        passed=$((passed+1))
     fi
 done
 
@@ -133,9 +157,11 @@ do
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
+        passed=$((passed+1))
     else 
         echo "KO"
         $($MINCAMLC $OPTION "$test_case")
+        failed=$((failed+1))
     fi
 done
 
@@ -145,8 +171,10 @@ do
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
+        failed=$((failed+1))
     else 
         echo "KO"
+        passed=$((passed+1))
     fi
 done
 
@@ -157,9 +185,11 @@ do
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
+        passed=$((passed+1))
     else 
         echo "KO"
         $($MINCAMLC $OPTION "$test_case")
+        failed=$((failed+1))
     fi
 done
 
@@ -169,8 +199,10 @@ do
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
+        failed=$((failed+1))
     else 
         echo "KO"
+        passed=$((passed+1))
     fi
 done
 
@@ -181,9 +213,11 @@ do
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
+        passed=$((passed+1))
     else 
         echo "KO"
         $($MINCAMLC $OPTION "$test_case")
+        failed=$((failed+1))
     fi
 done
 
@@ -193,9 +227,17 @@ do
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
         echo "OK"
+        failed=$((failed+1))
     else 
         echo "KO"
+        passed=$((passed+1))
     fi
 done
 
-echo "---------- END TESTING ----------\n"
+echo "\n---------- END TESTING ----------"
+echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they return KO)"
+echo "Tests failed : $failed / $((passed + failed))"
+echo "-----------------------------------\n"
+echo "Typechecker" >> resultats_tests.txt
+echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they return KO)" >> resultats_tests.txt
+echo "Tests failed : $failed / $((passed + failed))\n" >> resultats_tests.txt

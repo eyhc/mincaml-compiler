@@ -9,6 +9,10 @@ OPTION=-asml
 rm tests/gen-code/*.asml 2> /dev/null 1> /dev/null
 rm tests/gen-code/*.actual 2> /dev/null 1> /dev/null
 
+# variables to count the number of passed and failed tests
+passed=0
+failed=0
+
 # run one test case for each iteration in gen-code and make sure the asml code generated is correct and give the expected result
 echo "---------- TESTING FRONT-END PASSES TO ASML GENERATION ----------"
 echo "for Iteration 1 : arithmetic operations"
@@ -24,8 +28,10 @@ echo $(diff -s "$result" "$expected")
 if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
     then 
         echo "OK"
+        passed=$((passed+1))
     else
         echo "KO"
+        failed=$((failed+1))
 fi
 
 echo "\nfor Iteration 2 : call to external functions"
@@ -40,8 +46,10 @@ echo $(diff -s "$result" "$expected")
 if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
     then 
         echo "OK"
+        passed=$((passed+1))
     else
         echo "KO"
+        failed=$((failed+1))
 fi
 
 echo "\nfor Iteration 3 : if_then_else"
@@ -56,8 +64,10 @@ echo $(diff -s "$result" "$expected")
 if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
     then 
         echo "OK"
+        passed=$((passed+1))
     else
         echo "KO"
+        failed=$((failed+1))
 fi
 
 echo "\nfor Iteration 4 : functions"
@@ -72,8 +82,10 @@ echo $(diff -s "$result" "$expected")
 if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
     then 
         echo "OK"
+        passed=$((passed+1))
     else
         echo "KO"
+        failed=$((failed+1))
 fi
 
 echo "\nfor Iteration 5 : arrays and tuples"
@@ -88,8 +100,10 @@ echo $(diff -s "$result" "$expected")
 if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
     then 
         echo "OK"
+        passed=$((passed+1))
     else
         echo "KO"
+        failed=$((failed+1))
 fi
 
 test_case=tests/gen-code/change_value_in_array.ml
@@ -103,8 +117,10 @@ echo $(diff -s "$result" "$expected")
 if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
     then 
         echo "OK"
+        passed=$((passed+1))
     else
         echo "KO"
+        failed=$((failed+1))
 fi
 
 echo "\nfor Iteration 6 : closure"
@@ -119,8 +135,10 @@ echo $(diff -s "$result" "$expected")
 if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
     then 
         echo "OK"
+        passed=$((passed+1))
     else
         echo "KO"
+        failed=$((failed+1))
 fi
 
 echo "\nfor Iteration 7 : floats"
@@ -135,8 +153,16 @@ echo $(diff -s "$result" "$expected")
 if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
     then 
         echo "OK"
+        passed=$((passed+1))
     else
         echo "KO"
+        failed=$((failed+1))
 fi
 
-echo "---------- END TESTING ----------\n"
+echo "\n---------- END TESTING ----------"
+echo "Tests passed : $passed / $((passed + failed))"
+echo "Tests failed : $failed / $((passed + failed))"
+echo "-----------------------------------\n"
+echo "Generation asml" >> resultats_tests.txt
+echo "Tests passed : $passed / $((passed + failed))" >> resultats_tests.txt
+echo "Tests failed : $failed / $((passed + failed))" >> resultats_tests.txt

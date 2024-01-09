@@ -15,3 +15,4 @@ test:
 	./../scripts/mincaml-test-parser.sh
 	./../scripts/mincaml-test-typechecking.sh
 	./../scripts/mincaml-test-front-end.sh
+	cat ../resultats_tests.txt
