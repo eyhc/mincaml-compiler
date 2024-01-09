@@ -1,199 +1,307 @@
- type asml_expr =
-   | Var of string
-   | Int of int
-   | Let of string * asml_expr 
-   | Fun of asm_function
-   | Add of asml_expr * asml_expr
-   | Sub of asml_expr * asml_expr
-   | Mul of asml_expr * asml_expr
-   | Assign of string * asml_expr
-   | Tuple of (string * string * int)
-   | Call of string * string list
-   | Store of asml_expr * string 
-   | Load of string * asml_expr 
-   | Reg of string
-   | Unit
-          
- and asm_function = {
-   name : string;
-   params : asml_expr list;
-   body : asml_expr list;
- }
- ;;
- let asml = 
-   [ 
-     Fun { 
-       name = "_"; 
-       params = []; 
-       body = [Let ("x", Int 1); Let ("y", Int 2); Let ("a", Int 8);
-               Let ("b", Int 14); Assign ("a", Sub (Var "x", Var "y")); 
-               Assign ("z", Add (Var "x", Var "y")); 
-               Assign ("b", Mul (Var "a", Var "z")); 
-               Assign ("i", Mul (Var "a", Var "z"))]; 
-     } 
-   ] ;;
+
+type id_or_imm = Var of Id.t | Const of int
+
+type expr =
+| NOP
+| VAL of id_or_imm
+(* | LABEL of Id.l *)
+| NEG of Id.t
+| ADD of Id.t * id_or_imm
+| SUB of Id.t * id_or_imm
+| FNEG of Id.t
+| FADD of Id.t * Id.t
+| FSUB of Id.t * Id.t
+| FMUL of Id.t * Id.t
+| FDIV of Id.t * Id.t
+| NEW of id_or_imm
+| MEMGET of Id.t * id_or_imm
+| MEMASSIGN of Id.t * id_or_imm * Id.t
+| IFEQ of (Id.t*id_or_imm) * asmt * asmt
+| IFLE of (Id.t*id_or_imm) * asmt * asmt
+| IFGE of (Id.t*id_or_imm) * asmt * asmt
+| IFFEQUAL of (Id.t*Id.t) * asmt * asmt
+| IFFLE of (Id.t*Id.t) * asmt * asmt
+| CALL of Id.l * Id.t list
+| CALLCLO of Id.t * Id.t list
+
+and asmt =
+| LET of Id.t * expr * asmt (* let t = exp in asmt *)
+| EXP of expr
+
+and letdef =
+| Main of asmt
+| LetFloat of float
+| LetLabel of Id.l * Id.t list * asmt
+
+and asml = letdef list
+;;
+
+(* type pour la partie back-end *)
+type reg_expr =
+  | Int of int 
+  | Neg of string
+  | Add of string * reg_expr
+  | Sub of string * reg_expr
+  | Assign of string * reg_expr
+  | Call of string * string list
+
+  | Reg of string
+  | Unit
+
+and regt= 
+  | Let of string * reg_expr 
+  | Exp of reg_expr
+  | Store of reg_expr * string 
+  | Load of string * reg_expr 
+      
+and letregdef = 
+  | Fun of reg_function
+  
+and reg_function = {
+  name : string;
+  params : reg_expr list;
+  body : regt list ;
+}
+;;
+
+let asml = [(Main (LET ("x", VAL (Const 1), (LET ("y", VAL (Const 2), (LET ("a", (VAL (Const 8)),
+                                                                            (LET ("b", VAL (Const 14), (LET ("a", SUB ( "x", (Var "y")),
+                                                                                                             (LET ("z", ADD ("x", (Var "y")), 
+                                                                                                                   (LET ("b", SUB ("a", (Var "z")), 
+                                                                                                                         (LET ("i", ADD ("a", (Var "z")), EXP NOP)))))))))))))))))];;
  
- let num_registers = 9;;
+let print_hashtable my_hashtable =
+  Hashtbl.iter (fun key value ->
+      Printf.printf "%s -> %s\n" key value  (* Remplacez 'string_of_int' par une conversion appropriée pour votre type 'a' *)
+    ) my_hashtable;;
+let print_free my_list =
+  List.iter (fun elem ->
+      Printf.printf "%s\n" elem  (* Remplacez '%s' par le format approprié pour le type réel de vos éléments *)
+    ) my_list;;
+let print_intervals intervals =
+  List.iter (fun (key,start) ->
+      Printf.printf "(%s,(%s))\n" key start
+    ) intervals;; 
+
+let num_registers = 3;;
  (* hashmap de toutes les variables sur la pile avec leurs adresses
- exemple : "x" "FP - 4" : *)
- let var_in_stack = Hashtbl.create 0;;
-     (* 
- hashtable binding variable to register,
- a : r1 -> variable `a` is in register `r1` 
- *)
- let var_to_register = Hashtbl.create num_registers;;
- 
+exemple : "x" "FP - 4" : *)
+let var_in_stack = Hashtbl.create 0;;
+     (* parcours_asmt
+hashtable binding variable to register,
+a : r1 -> variable `a` is in register `r1` 
+*)
+let var_to_register = Hashtbl.create num_registers;;
+
  (* Retourne pour chaque ligne i les prochaines variables qui vont etre utilisées *)
- let get_intervals_i asml i =
-   let list = ref [] in
-   let rec i_intervals asml index  =
-     match asml with
-     | Fun f :: tail -> i_intervals f.body index;
-         i_intervals tail (index + (List.length f.body));
-     | hd :: tail ->
-         ( match hd with
-           | _ when (List.length !list) = num_registers -> ()
-           | Let (var, _) ->
-               list := !list @ [(var,index)];
-               i_intervals tail (index + 1)
-           | Assign (var, e1) ->
-               if not (List.exists (fun (v, _) -> v = var) !list) then begin
-                 list := !list @ [(var,index)];
-                 i_intervals [e1] index;
-                 i_intervals tail (index + 1)
-               end
-               else begin
-                 i_intervals [e1] index;
-                 i_intervals tail (index + 1)
-               end
-           | Add (e1,e2) | Sub (e1,e2) | Mul (e1,e2) ->
-               i_intervals [e1] index;
-               i_intervals [e2] index
-           | Var var ->
-               if not (List.exists (fun (v, _) -> v = var) !list) then
-                 list := !list @ [(var,index)];
-           | _ -> i_intervals tail (index + 1))
-     | [] -> ()
-   in i_intervals asml i;
-   let l = list
-   in l
- ;;
+let get_intervals_i asml = 
+  let list = ref [] in
+  let rec i_intervals_asmt asmt =
+    match asmt with 
+    | LET (var1, var2, exp) -> 
+        if not ((List.length !list) = num_registers) then begin
+          i_intervals_string var1;
+          i_intervals_expr var2;
+          i_intervals_asmt exp; 
+        end
+    | EXP expr -> i_intervals_expr expr;
+        
+  and i_intervals_string var = 
+    if not ((List.length !list) = num_registers) then begin
+      if not (List.exists (fun v -> v = var) !list) then 
+        list := !list @ [var]; 
+    end                    
+  and i_intervals_id_or_imm id_or_im =
+    match id_or_im with
+    | Var v -> i_intervals_string v
+    | Const _ -> ()
+                 
+  and i_intervals_expr expr =
+    match expr with 
+    | VAL v ->
+        i_intervals_id_or_imm v
+    | NEG s ->
+        i_intervals_string s
+    | ADD (s, id_or_im) | SUB (s, id_or_im)  ->
+        i_intervals_string s;
+        i_intervals_id_or_imm id_or_im 
+    | NOP -> () 
+    | _ when (List.length !list) = num_registers -> () 
+    | _ -> ()
+             (* and i_intervals asml =
+                 match asml with
+                 | _ when (List.length !list) = num_registers -> () 
+                 | (Main hd) :: tail -> 
+                     i_intervals_asmt hd;
+                     i_intervals tail
+                 | LetFloat _ :: tl -> () (* A definir *)
+                 | LetLabel (_,_,_) :: tl -> () (* A definir *) *)
+  in
+  i_intervals_asmt asml ;
+  let l = list in l
+;;
+
+(* on va renvoyer asml avce le nom de la fonction quand on appelle i_get_interval *)
 
  (* retourne une list de var qui doivent etre store car presente dans la hashmap mais pas dans la liste active *) 
- let var_not_in_list hashmap active =
-   let strings_in_list = List.map (fun (str, _) -> str) active in
-   Hashtbl.fold (fun key value acc -> if not (List.mem key strings_in_list) then (key,value) :: acc else acc) hashmap []
- ;;
+let var_not_in_list hashmap active =
+  let strings_in_list = List.map (fun str -> str) active in
+  Hashtbl.fold (fun key value acc -> if not (List.mem key strings_in_list) then (key,value) :: acc else acc) hashmap []
+;;
  
  (* retourne une liste des var a mettre dans les registres (load ou let)*)
- let var_not_in_hash hashmap active = 
-   List.fold_left (fun acc (key, _) -> 
-       match Hashtbl.find_opt hashmap key with 
-       | Some _ -> acc  (* si la cle est deja  dans la hashmap, ne rien faire *) 
-       | None -> key :: acc  (* sinon, on ajoute la cle a la liste *) 
-     ) [] active 
- ;;
+let var_not_in_hash hashmap active = 
+  List.fold_left (fun acc key -> 
+      match Hashtbl.find_opt hashmap key with 
+      | Some _ -> acc  (* si la cle est deja  dans la hashmap, ne rien faire *) 
+      | None -> key :: acc  (* sinon, on ajoute la cle a la liste *) 
+    ) [] active 
+;;
  
- let store_load intervals body =
+
+
+let store_load intervals body =
    (* a la premiere ligne hashtable est vide, on y met les 9 variables *)
-   if (Hashtbl.length var_to_register) = 0 then begin 
-     let rec add_hashmap n inter =
-       match inter with
-       | [] -> ()
-       | _ when n >= num_registers -> ()
-       | (var, v) :: tail -> 
-           Hashtbl.add var_to_register var ("r" ^ string_of_int (n + 4)); (* + 4  car commence a r4 *)
-           add_hashmap (n + 1) tail
-     in
-     add_hashmap 0 !intervals;
-   end
-   else
-     (* on recupere la liste des var a store *)
-     let rec parcours_store list_store active_a_ajouter =
-       match list_store with
-       | (v,r) ::  tl ->
-           Hashtbl.remove var_to_register v;
-           (try
-              let adr = Hashtbl.find var_in_stack v in
-              body := !body @ [Store (Reg r, adr)];
-            with Not_found ->
-              let adr = "FP - " ^ string_of_int (((Hashtbl.length var_in_stack) + 1) * 4) in
-              Hashtbl.add var_in_stack v adr;
-              body := !body @ [Store (Reg r, adr)]);
-           (try
-              let var = List.hd active_a_ajouter in
-              Hashtbl.add var_to_register var r;
-              (try
+  if (Hashtbl.length var_to_register) = 0 then begin 
+    let rec add_hashmap n inter =
+      match inter with
+      | [] -> ()
+      | _ when n >= num_registers -> ()
+      | var :: tail -> 
+          Hashtbl.add var_to_register var ("r" ^ string_of_int (n + 4)); (* + 4  car commence a r4 *)
+          add_hashmap (n + 1) tail
+    in
+    add_hashmap 0 !intervals; 
+  end
+  else
+     (* sinon, on recupere la liste des var a store *)
+    let rec parcours_store list_store active_a_ajouter =
+      match list_store with
+      | (v,r) ::  tl ->
+          Hashtbl.remove var_to_register v;
+          (try
+             let adr = Hashtbl.find var_in_stack v in
+             body := !body @ [Store ((Reg r), adr)];
+           with Not_found ->
+             let adr = "FP - " ^ string_of_int (((Hashtbl.length var_in_stack) + 1) * 4) in
+             Hashtbl.add var_in_stack v adr;
+             body := !body @ [Store ((Reg r), adr)]);
+          (try
+             let var = List.hd active_a_ajouter in
+             Hashtbl.add var_to_register var r;
+             (try
                   (*  si la var est presente dans la pile, on load *)
-                 let value = Hashtbl.find var_in_stack var in
-                 body := !body @ [Load (value, Reg r)]; 
-               with e -> ());
-            with e -> ());
-           parcours_store tl (try (List.tl active_a_ajouter) with Failure tl -> []);
-       | [] -> ()
-     in 
-     let store = var_not_in_list var_to_register !intervals in 
-     let active_a_ajouter = var_not_in_hash var_to_register !intervals in 
-     parcours_store store active_a_ajouter; 
-     ()
- ;;
- 
- (* Retourne asml_expr en remplacant par registres pour Int, Var, Add, Sub, Mul *)
- let rec expr_asml expr =
-   match expr with
-   | Int n -> Int n
-   | Var r -> Reg (Hashtbl.find var_to_register r)
-   | Add (e1, e2) -> Add ((expr_asml e1), (expr_asml e2))
-   | Sub (e1, e2) -> Sub ((expr_asml e1), (expr_asml e2))
-   | Mul (e1, e2) -> Mul ((expr_asml e1), (expr_asml e2))
-   | _ -> Unit;;
- 
- let parcours asml =
-   let rec parcours list_asml i new_body =
-     match list_asml with
-     | hd :: tail ->
-         (match hd with 
-          | Fun f -> 
-              let new_func : asm_function = {
-                name = f.name;
-                params = f.params;
-                body = parcours f.body i (ref []);
-              } in 
-              new_body := !new_body @ [Fun new_func];
-              parcours tail (i + (List.length f.body)) new_body;
-          | Let (v, e1) -> 
-              let active = get_intervals_i list_asml i in
-              store_load active new_body;
-              new_body:= !new_body @ [Let ((Hashtbl.find var_to_register v), (expr_asml e1))]; 
-              parcours tail (i + 1) new_body 
-          | Assign (s,e1) ->
-              let active = get_intervals_i list_asml i in
-              store_load active new_body;
-              new_body:= !new_body @ [Assign ((Hashtbl.find var_to_register s), (expr_asml e1))]; 
-              parcours tail (i + 1) new_body 
-          | _ -> 
-              parcours tail (i + 1) new_body ); 
-     | [] -> 
-         store_load (ref []) new_body;
-         !new_body;
- 
-   in
-   let new_body = ref [] in 
-   parcours asml 1 new_body;;
- 
+                let value = Hashtbl.find var_in_stack var in
+                body := !body @ [Load (value, Reg r)]; 
+              with e -> ());
+           with e -> ());
+          parcours_store tl (try (List.tl active_a_ajouter) with Failure tl -> []);
+      | [] -> ()
+    in 
+    let store = var_not_in_list var_to_register !intervals in 
+    let active_a_ajouter = var_not_in_hash var_to_register !intervals in 
+    parcours_store store active_a_ajouter; 
+    ()
+;; 
 
 
-   (* Fonction print 
-  let print_hashtable my_hashtable =
-    Hashtbl.iter (fun key value ->
-        Printf.printf "%s -> %s\n" key value  (* Remplacez 'string_of_int' par une conversion appropriée pour votre type 'a' *)
-      ) my_hashtable;;
-  let print_free my_list =
-    List.iter (fun elem ->
-        Printf.printf "%s\n" elem  (* Remplacez '%s' par le format approprié pour le type réel de vos éléments *)
-      ) my_list;;
-  let print_intervals intervals =
-    List.iter (fun (key,start) ->
-        Printf.printf "(%s,(%s))\n" key start
-      ) intervals;; 
-  *)
+
+let parcours asml =
+  let new_body = ref [] in 
+
+  let rec parcours_asmt asmt bd =
+    match asmt with
+    | LET (var1, var2, exp) ->
+        let active = get_intervals_i asmt in
+        store_load active bd;
+        bd := !bd @ [Let ((Hashtbl.find var_to_register var1), (parcours_expr var2))];
+        parcours_asmt exp bd; 
+    | EXP expr -> 
+        let active = get_intervals_i asmt in
+        store_load active bd;
+        bd := !bd @ [Exp (parcours_expr expr)];
+        bd
+  and parcours_id_or_im id_or_im =
+    match id_or_im with
+    | Const n -> Int n
+    | Var r ->  Reg (Hashtbl.find var_to_register r)
+                  
+  and parcours_expr expr =
+    match expr with
+    | VAL v -> 
+        parcours_id_or_im v
+    | NEG s ->
+        Neg (Hashtbl.find var_to_register s)
+    | ADD (s, id_or_im) -> 
+        Add (Hashtbl.find var_to_register s, parcours_id_or_im id_or_im)
+    | SUB (s, id_or_im) -> 
+        Sub (Hashtbl.find var_to_register s, parcours_id_or_im id_or_im)
+    | NOP -> Unit
+    | _ -> Unit
+
+  and parcours_asml_list asml_list =
+    match asml_list with
+    | Main hd :: tl -> 
+        let new_func : reg_function = {
+          name = "Main";
+          params = [];
+          body = !(parcours_asmt hd (ref []));
+        } in 
+        new_body:= !new_body @ [Fun new_func];
+        parcours_asml_list tl 
+    | LetFloat _ :: tl -> !new_body (* À définir *)
+    | LetLabel (_,_,_) :: tl-> !new_body (* À définir *) 
+    | [] -> !new_body
+  in 
+  parcours_asml_list asml;
+;;
+
+let rec print_reg_expr reg_expr =
+  match reg_expr with
+  | Int i -> Printf.printf "(Int : %d)" i
+  | Neg s -> Printf.printf "(Neg :%s)" s
+  | Add (s, expr) -> Printf.printf "(Add (%s," s ;
+      print_reg_expr expr;
+      Printf.printf "))";
+  | Sub (s, expr) -> Printf.printf "(Sub (%s," s ;
+    print_reg_expr expr;
+    Printf.printf "))";
+  | Assign (s, expr) -> Printf.printf "(Assign (%s," s ;
+  print_reg_expr expr;
+  Printf.printf "))";
+  | Call (name, args) ->
+      Printf.printf "Call(%s, [%s])" name (String.concat "; " args)
+  | Reg s -> Printf.printf  "Reg %s" s
+  | Unit -> Printf.printf  "Unit"
+
+and print_regt  regt =
+  match regt with
+  | Let (s, expr) -> Printf.printf "(Let (%s," s ;
+  print_reg_expr expr;
+  Printf.printf "))\n";
+  | Exp expr -> Printf.printf "(Exp (" ;
+  print_reg_expr expr;
+  Printf.printf "))\n";
+  | Store (expr, s) -> Printf.printf " (Store (" ;
+  print_reg_expr expr;
+  Printf.printf ", %s)) " s;
+  | Load (s, expr) -> Printf.printf " (Load (%s," s;
+  print_reg_expr expr;
+  Printf.printf ")) ";
+
+  ;;
+
+let rec print_reg_function reg_function =
+  match reg_function with 
+  | Fun f :: tl ->  Printf.printf "Function name: %s\n" f.name;
+  Printf.printf "Parameters: []\n";
+  Printf.printf "Body:\n";
+  List.iter (fun regt -> print_regt regt) f.body;
+  print_reg_function tl
+  | [] -> ()
+;;
+
+
+let () = 
+let resutl = parcours asml in
+print_reg_function resutl;;
