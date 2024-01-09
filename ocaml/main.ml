@@ -91,6 +91,7 @@ let print_optim ast =
   let res = Alpha.conversion res in
   let res = Beta.reduction res in 
   let res = Reduction.reduction res in
+  let res = Inline.expansion res in
   print_endline (Knorm.to_string res)
 
 let print_closure ast =
@@ -122,8 +123,9 @@ let iter_optim ast =
     else
       let a = Beta.reduction ast in          (* Beta reduction *)
       let a = Reduction.reduction a in       (* Reduction of nested-let *)
-      (* Inline expansion | Constant folding | Elim. unnecessary def *)
-      if a = ast then a else iter_rec a (n-1)
+      let a = Inline.expansion a in          (* Inline expansion *)
+      (* Constant folding | Elim. unnecessary def *)
+      a (* to_do : ne plus itérérer si on atteint un point fixe *)
   in iter_rec ast !n_iter_optim
 
 (* Display asml of file f*)
