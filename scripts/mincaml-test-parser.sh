@@ -45,6 +45,7 @@ echo "\n---------- END TESTING ----------"
 echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they return KO)"
 echo "Tests failed : $failed / $((passed + failed))"
 echo "-----------------------------------\n"
-echo "Parser" > resultats_tests.txt
+echo "RESUME DES TESTS" > resultats_tests.txt
+echo "Parser" >> resultats_tests.txt
 echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they return KO)" >> resultats_tests.txt
 echo "Tests failed : $failed / $((passed + failed))\n" >> resultats_tests.txt

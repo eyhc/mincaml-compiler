@@ -4,5 +4,7 @@ let rec addBy x =
   let rec adder z = x - y + z in
   adder in
   print_int((addBy 1) 35);
+  print_newline();
   print_int((addBy 0) 2);
+  print_newline();
   print_int((addBy (-3)) 50)
