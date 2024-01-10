@@ -136,9 +136,9 @@ let print_asml f =
     let ast = Alpha.conversion ast in        (* Alpha-conversion *)
     let ast = iter_optim ast in              (* Optimisations *)
     let ast = Closure.closure ast in         (* Closure conversion *)
-    let asml = Asml.generation ast in        (* ASML generation *)
+    (*et asml = Asml.generation ast in*)        (* ASML generation *)
                                              (* Immediate optimisation *)
-    print_endline (Asml.to_string asml)      (* Displaying *)
+    print_endline (Closure.to_string ast)      (* Displaying *)
 
 
 (* Compile code file f to arm (32?) *)
@@ -149,11 +149,11 @@ let main (inp:string) (out:string) : unit =
     let ast = Alpha.conversion ast in        (* Alpha-conversion *)
     let ast = iter_optim ast in              (* Optimisations *)
     let ast = Closure.closure ast in         (* Closure conversion *)
-    let asml = Asml.generation ast in        (* ASML generation *)
+    (*let asml = Asml.generation ast in*)        (* ASML generation *)
                                              (* Immediate optimisation *)
                                              (* ARM generation *)
     ();                                      (* Saving result in file *)
-    print_endline (Asml.to_string asml)
+    print_endline (Closure.to_string ast)
 
 
 (* MAIN *)
