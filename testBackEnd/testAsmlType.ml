@@ -22,6 +22,13 @@ and reg_function = {
   body : regt list;
 }
 
+let if_label_counter = ref 0
+
+let generate_if_label () =
+  let label = "l" ^ string_of_int !if_label_counter in
+  if_label_counter := !if_label_counter + 1;
+  label
+
 let rec count_lets_in_regt : regt -> int = function
   | Let (_, _) -> 1
   | Exp _ | Store (_, _) | Load (_, _) -> 0
@@ -46,19 +53,22 @@ let rec count_lets_in_reg_function : reg_function -> int =
         | _ -> ["Error"])
      | Call (func_name) -> [Printf.sprintf "bl %s" func_name; Printf.sprintf "mov %s, r0" s]
      | _ -> ["Error"])
-    | Exp exp ->
-    (match exp with
-      | If (cmp_type, (r1, Reg r2), true_branch, false_branch) ->
-        let true_label = "true_label" in
-        let end_label = "end_label" in
-        Printf.sprintf "cmp %s, %s" r1 r2 ::
-        Printf.sprintf "b%s %s" cmp_type true_label ::
-        List.concat (List.map generate_asm_regt false_branch) @
-        Printf.sprintf "b %s" end_label ::
-        Printf.sprintf "%s:" true_label ::
-        List.concat (List.map generate_asm_regt true_branch) @
-        Printf.sprintf "%s:" end_label :: []
-      | _ -> ["Error"])
+  | Exp exp ->
+  (match exp with
+    | If (cmp_type, (r1, Reg r2), true_branch, false_branch) ->
+      let true_label = generate_if_label () in
+      let end_label = generate_if_label () in
+      Printf.sprintf "cmp %s, %s" r1 r2 ::
+      Printf.sprintf "b%s %s" cmp_type true_label ::
+      List.concat (List.map generate_asm_regt false_branch) @
+      Printf.sprintf "b %s" end_label ::
+      Printf.sprintf "%s:" true_label ::
+      List.concat (List.map generate_asm_regt true_branch) @
+      Printf.sprintf "%s:" end_label :: []
+    | Int n -> [Printf.sprintf "mov r0, #%d" n]
+    | Reg reg -> [Printf.sprintf "mov r0, %s" reg]
+    | Unit -> []
+    | _ -> ["Error"])
   | Store (Reg reg, mem) -> [Printf.sprintf "str %s, %s" reg mem]
   | Load (s, Reg reg) -> [Printf.sprintf "ldr %s, %s" reg s]
   | _ -> ["Not Found"]
@@ -93,18 +103,21 @@ let () =
         { name = "_";
           body =
             [
-              Let ("r4", Int 1); Store (Reg "r4", "[FP - 4]"); Let ("r5", Call("_f"));
-              Store (Reg "r5", "[FP - 8]");
+              Let ("r4", Int 1); Store (Reg "r4", "[fp - 4]"); Let ("r5", Call("_f"));
+              Store (Reg "r5", "[fp - 8]");
               Exp(If("le", ("r4", Reg "r5"), [Let("r6", Int 1)], [Let("r6", Int 2)]));
               Let ("r6", Sub ("r5", Reg "r4"));
-              Store (Reg "r6", "[FP - 16]"); Let ("r6", Add ("r5", Reg "r4"));
-              Store (Reg "r5", "[FP - 4]");
+              Store (Reg "r6", "[fp - 16]"); Let ("r6", Add ("r5", Reg "r4"));
+              Store (Reg "r5", "[fp - 4]");
+              Exp (Int 2)
             ]
           };
           Fun 
           { name = "_f";
           body =
-            [Let ("r4", Reg "r0"); Store (Reg "r4", "[FP - 4]");]
+            [Let ("r4", Reg "r0"); Store (Reg "r4", "[fp - 4]");
+            Exp (Int 5)
+            ]
           };
         ]
   in
