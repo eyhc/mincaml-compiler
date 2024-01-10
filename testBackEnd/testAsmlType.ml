@@ -1,231 +1,98 @@
-type asml_expr =
-  | Var of string
-  | Int of int
-  | Let of asml_expr * asml_expr
-  | Fun of asm_function
-  | Add of asml_expr * asml_expr
-  | Sub of asml_expr * asml_expr
-  | Mul of asml_expr * asml_expr
-  | Assign of asml_expr * asml_expr
-  | Tuple of (string * string * int)
+type reg_expr =
+  | Int of int 
+  | Neg of string
+  | Add of string * reg_expr
+  | Sub of string * reg_expr
   | Call of string * string list
+  | Reg of string
+  | Unit
 
-and asm_function = {
+and regt = 
+  | Let of string * reg_expr 
+  | Exp of reg_expr
+  | Store of reg_expr * string 
+  | Load of string * reg_expr 
+
+and letregdef = 
+  | Fun of reg_function
+
+and reg_function = {
   name : string;
-  params : asml_expr list;
-  body : asml_expr list;
+  params : reg_expr list;
+  body : regt list;
 }
 
-let rec generate_asm_expr : asml_expr -> string list = function
-  | Var _ | Int _ -> []
-  | Let (expr1, expr2) ->
+let rec count_lets_in_regt : regt -> int = function
+  | Let (_, _) -> 1
+  | Exp _ | Store (_, _) | Load (_, _) -> 0
 
-    let get_var_result = function
-      | Tuple (inner_var, _, _) -> inner_var
-      | Int n -> "#" ^ string_of_int n
-      | _ -> failwith "Invalid expression in Let"
-    in
+let rec count_lets_in_reg_function : reg_function -> int =
+  fun { body; _ } -> List.fold_left (fun acc stmt -> acc + count_lets_in_regt stmt) 0 body
 
-    let get_mem_pos_result = function
-      | Tuple (_, mem_pos, _) -> mem_pos
-      | _ -> failwith "Invalid expression in Let"
-    in
+let rec generate_asm_regt : regt -> string list = function
+  | Let (s, expr) ->
+    (match expr with
+     | Int n -> [Printf.sprintf "MOV %s, #%d" s n]
+     | Reg reg -> [Printf.sprintf "MOV %s, %s" s reg]
+     | Add (s1, expr) ->
+       (match expr with
+        | Int n -> [Printf.sprintf "ADD %s, %s, #%d" s s1 n]
+        | Reg reg -> [Printf.sprintf "ADD %s, %s, %s" s s1 reg]
+        | _ -> ["Error"])
+     | Sub (s1, expr) ->
+       (match expr with
+        | Int n -> [Printf.sprintf "SUB %s, %s, #%d" s s1 n]
+        | Reg reg -> [Printf.sprintf "SUB %s, %s, %s" s s1 reg]
+        | _ -> ["Error"])
+     | _ -> ["Error"])
+  | Exp _ -> [] (* Do nothing for Exp *)
+  | Store (Reg reg, mem) -> [Printf.sprintf "STR %s, %s" reg mem]
+  | Load (s, Reg reg) -> [Printf.sprintf "LDR %s, %s" reg s]
 
-    let ld_expr2 =
-      match expr2 with
-      | Tuple (inner_var2, inner_mem_pos2, in_register) ->
-          if in_register == 0 then
-            ["LDR " ^ inner_var2 ^ ", " ^ inner_mem_pos2]
-          else
-            []
-      | _ -> []
-    in
+and generate_asm_fun_internal : string list -> regt list -> string list = fun acc body ->
+  match body with
+  | [] -> acc @ ["ADD SP, FP, #0"; "LDR FP, [SP]"; "ADD SP, SP, #4"]
+  | hd :: tl -> generate_asm_fun_internal (acc @ (generate_asm_regt hd)) tl
 
-    ld_expr2 @ ["MOV " ^ get_var_result expr1 ^ ", " ^ get_var_result expr2;
-     "STR " ^ get_var_result expr1 ^ ", " ^ get_mem_pos_result expr1]
-  
-  | Assign (expr1, expr2) ->
-
-    let get_var_result = function
-      | Tuple (inner_var, _, _) -> inner_var
-      | Int n -> "#" ^ string_of_int n
-      | _ -> failwith "Invalid expression in Let"
-    in
-
-    let get_mem_pos_result = function
-      | Tuple (_, mem_pos, _) -> mem_pos
-      | _ -> failwith "Invalid expression in Let"
-    in
-
-    let expr2_ins =
-      match expr2 with
-      | Add (inner_expr1, inner_expr2) ->
-        let ld_inner_expr1 =
-          match inner_expr1 with
-          | Tuple (inner_var1, inner_mem_pos1, in_register) ->
-            if in_register == 0 then
-              ["LDR " ^ inner_var1 ^ ", " ^ inner_mem_pos1]
-            else
-              []
-          | _ -> []
-        in
-
-        let ld_inner_expr2 =
-          match inner_expr2 with
-          | Tuple (inner_var1, inner_mem_pos1, in_register) ->
-            if in_register == 0 then
-              ["LDR " ^ inner_var1 ^ ", " ^ inner_mem_pos1]
-            else
-              []
-          | _ -> []
-        in
-
-        let add_expr =
-          match (get_var_result inner_expr1, get_var_result inner_expr2) with
-          | (s1, s2) when String.length s1 > 0 && s1.[0] = '#' && String.length s2 > 0 && s2.[0] = '#' ->
-            ["MOV " ^ get_var_result expr1 ^ ", " ^ s1;
-              "ADD " ^ get_var_result expr1 ^ ", " ^ get_var_result expr1 ^ ", " ^ s2]
-          | (s1, _) when String.length s1 > 0 && s1.[0] = '#' ->
-            ["ADD " ^ get_var_result expr1 ^ ", " ^ get_var_result inner_expr2 ^ ", " ^ get_var_result inner_expr1]
-          | (_, _) ->
-            ["ADD " ^ get_var_result expr1 ^ ", " ^ get_var_result inner_expr1 ^ ", " ^ get_var_result inner_expr2]
-        in
-      
-        ld_inner_expr1 @ ld_inner_expr2 @ add_expr @
-        ["STR " ^ get_var_result expr1 ^ ", " ^ get_mem_pos_result expr1]
-    
-      | Sub (inner_expr1, inner_expr2) ->
-        let ld_inner_expr1 =
-          match inner_expr1 with
-          | Tuple (inner_var1, inner_mem_pos1, in_register) ->
-            if in_register == 0 then
-              ["LDR " ^ inner_var1 ^ ", " ^ inner_mem_pos1]
-            else
-              []
-          | _ -> []
-        in
-
-        let ld_inner_expr2 =
-          match inner_expr2 with
-          | Tuple (inner_var1, inner_mem_pos1, in_register) ->
-            if in_register == 0 then
-              ["LDR " ^ inner_var1 ^ ", " ^ inner_mem_pos1]
-            else
-              []
-          | _ -> []
-        in
-      
-        let sub_expr =
-          match (get_var_result inner_expr1, get_var_result inner_expr2) with
-          | (s1, s2) when String.length s1 > 0 && s1.[0] = '#' && String.length s2 > 0 && s2.[0] = '#' ->
-            ["MOV " ^ get_var_result expr1 ^ ", " ^ s1;
-              "SUB " ^ get_var_result expr1 ^ ", " ^ get_var_result expr1 ^ ", " ^ s2]
-          | (s1, _) when String.length s1 > 0 && s1.[0] = '#' ->
-            ["RSB " ^ get_var_result expr1 ^ ", " ^ get_var_result inner_expr1 ^ ", " ^ get_var_result inner_expr2]
-          | (_, _) ->
-            ["SUB " ^ get_var_result expr1 ^ ", " ^ get_var_result inner_expr1 ^ ", " ^ get_var_result inner_expr2]
-        in
-      
-        ld_inner_expr1 @ ld_inner_expr2 @ sub_expr @
-        ["STR " ^ get_var_result expr1 ^ ", " ^ get_mem_pos_result expr1]
-
-      | Mul (inner_expr1, inner_expr2) ->
-        let ld_inner_expr1 =
-          match inner_expr1 with
-          | Tuple (inner_var1, inner_mem_pos1, in_register) ->
-            if in_register == 0 then
-              ["LDR " ^ inner_var1 ^ ", " ^ inner_mem_pos1]
-            else
-              []
-          | _ -> []
-        in
-
-        let ld_inner_expr2 =
-          match inner_expr2 with
-          | Tuple (inner_var1, inner_mem_pos1, in_register) ->
-            if in_register == 0 then
-              ["LDR " ^ inner_var1 ^ ", " ^ inner_mem_pos1]
-            else
-              []
-          | _ -> []
-        in
-      
-        let mul_expr =
-          match (get_var_result inner_expr1, get_var_result inner_expr2) with
-          | (s1, s2) when String.length s1 > 0 && s1.[0] = '#' && String.length s2 > 0 && s2.[0] = '#' ->
-            ["MOV " ^ get_var_result expr1 ^ ", " ^ s1;
-              "MUL " ^ get_var_result expr1 ^ ", " ^ get_var_result expr1 ^ ", " ^ s2]
-          | (s1, _) when String.length s1 > 0 && s1.[0] = '#' ->
-            ["MUL " ^ get_var_result expr1 ^ ", " ^ get_var_result inner_expr2 ^ ", " ^ get_var_result inner_expr1]
-          | (_, _) ->
-            ["MUL " ^ get_var_result expr1 ^ ", " ^ get_var_result inner_expr1 ^ ", " ^ get_var_result inner_expr2]
-        in
-      
-        ld_inner_expr1 @ ld_inner_expr2 @ mul_expr @
-        ["STR " ^ get_var_result expr1 ^ ", " ^ get_mem_pos_result expr1]
-
-    | _ -> failwith "Unknown assign instruction"
-
-    in
-    
-    expr2_ins
-
-  | Fun { name; params; body } ->
-    let rec generate_asm_fun_internal acc = function
-      | [] -> acc @ ["ADD SP, FP, #0"; "LDR FP, [SP]"; "ADD SP, SP, #4"]
-      | hd :: tl ->
-        let asm_hd = generate_asm_expr hd in
-        generate_asm_fun_internal (acc @ asm_hd) tl
-    in
-    let size = List.length (List.filter (function Let _ | Assign _ -> true | _ -> false) body) in
-    generate_prologue size @ generate_asm_fun_internal [] body
-
-  | _ -> failwith "Unsupported operation"
+and generate_asm_reg_function : reg_function -> string list = fun { name; params; body } ->
+  let size = count_lets_in_reg_function { name; params; body } in
+  generate_prologue size @ generate_asm_fun_internal [] body
 
 and generate_prologue size =
   ["ADD SP, SP, #-4"; "STR FP, [SP]"; "ADD FP, SP, #0"; "ADD SP, SP, #-" ^ string_of_int (size * 4)]
 
-let generate_asm (exprs: asml_expr list) : string list =
-  match List.filter (function Fun { name; _ } when name = "_" -> true | _ -> false) exprs with
+let generate_asm_reg (defs: letregdef list) : string list =
+  match List.filter (function Fun { name; _ } when name = "_" -> true | _ -> false) defs with
   | [] -> failwith "No matching function with name '_'"
-  | [funExpr] ->
+  | [funDef] ->
     let rec generate_asm_internal acc = function
       | [] -> acc
-      | hd :: tl ->
-        let asm_hd = generate_asm_expr hd in
+      | hd :: tl -> 
+        let asm_hd = match hd with Fun f -> generate_asm_reg_function f in
         generate_asm_internal (acc @ asm_hd) tl
     in
-    generate_asm_internal [] [funExpr]
+    generate_asm_internal [] [funDef]
   | _ :: _ :: _ -> failwith "Multiple functions with name '_' found"
 
 let () =
-  let result_asm =
-    generate_asm
-      [
-        Fun {
-          name = "_f";
-          params = [];
-          body = [
-            Let (Tuple("r0", "[FP - 4]", 1), Int 10);
-            Let (Tuple("r0", "[FP - 4]", 1), Tuple("r1", "[FP - 8]", 1));
-            Let (Tuple("r0", "[FP - 4]", 1), Tuple("r1", "[FP - 8]", 0));
-
-          ];
-        };
-        Fun {
-          name = "_";
-          params = [];
-          body = [
-            Assign(Tuple("r0", "[FP - 4]", 1), Sub (Tuple("r1", "[FP - 8]", 0), Tuple("r2", "[FP - 12]", 0)));
-          ];
-        }
-      ]
+  let result_asm_reg =
+    generate_asm_reg
+      [Fun
+        { name = "_"; params = [];
+          body =
+            [Let ("r4", Int 1); Store (Reg "r4", "[FP - 4]"); Let ("r5", Int 2);
+             Store (Reg "r5", "[FP - 8]"); Load ("[FP - 4]", Reg "r5");
+             Let ("r6", Int 8); Let ("r4", Int 14); Store (Reg "r4", "[FP - 12]");
+             Load ("[FP - 8]", Reg "r4"); Let ("r6", Sub ("r5", Reg "r4"));
+             Store (Reg "r6", "[FP - 16]"); Let ("r6", Add ("r5", Reg "r4"));
+             Store (Reg "r5", "[FP - 4]"); Load ("[FP - 16]", Reg "r5");
+             Store (Reg "r4", "[FP - 8]"); Load ("[FP - 12]", Reg "r4");
+             Let ("r4", Sub ("r5", Reg "r6")); Store (Reg "r4", "[FP - 12]");
+             Let ("r4", Add ("r5", Reg "r6")); Store (Reg "r4", "[FP - 20]");
+             Store (Reg "r6", "[FP - 24]"); Store (Reg "r5", "[FP - 16]")]}]
   in
-  let output_file = "output.asm" in
-  let oc = open_out output_file in
-  List.iter (fun instruction -> output_string oc (instruction ^ "\n")) result_asm;
-  close_out oc;
-  print_endline ("Results written to " ^ output_file)
-  
-
-
+  let output_file_reg = "output.asm" in
+  let oc_reg = open_out output_file_reg in
+  List.iter (fun instruction -> output_string oc_reg (instruction ^ "\n")) result_asm_reg;
+  close_out oc_reg;
+  print_endline ("Results written to " ^ output_file_reg)
