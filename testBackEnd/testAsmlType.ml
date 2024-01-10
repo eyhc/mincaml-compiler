@@ -98,20 +98,16 @@ let generate_asm_reg (defs: letregdef list) : string list =
 let () =
   let result_asm_reg =
     generate_asm_reg
-      [
-        Fun
-        { name = "_";
-          body =
-            [
-              Let ("r4", Int 1); Store (Reg "r4", "[fp - 4]"); Let ("r5", Call("_f"));
-              Store (Reg "r5", "[fp - 8]");
-              Exp(If("le", ("r4", Reg "r5"), [Let("r6", Int 1)], [Let("r6", Int 2)]));
-              Let ("r6", Sub ("r5", Reg "r4"));
-              Store (Reg "r6", "[fp - 16]"); Let ("r6", Add ("r5", Reg "r4"));
-              Store (Reg "r5", "[fp - 4]");
-              Exp (Int 2)
-            ]
-          };
+    [Fun
+    {name = "Main";
+     body =
+      [Let ("r4", Int 1); Store (Reg "r4", "fp - 4"); Let ("r5", Int 2);
+       Store (Reg "r5", "fp - 8"); Let ("r6", Int 8); Let ("r4", Int 14);
+       Store (Reg "r4", "fp - 12"); Let ("r5", Int 14);
+       Store (Reg "r5", "fp - 16"); Load ("fp - 4", Reg "r5");
+       Let ("r0", Reg "r6"); Let ("r1", Reg "r4"); Let ("r2", Reg "r5");
+       Load ("fp - 12", Reg "r3"); Load ("fp - 16", Reg "r4");
+       Exp (Call "bonjour")]} ;
           Fun 
           { name = "_f";
           body =
