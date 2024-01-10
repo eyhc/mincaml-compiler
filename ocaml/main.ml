@@ -69,25 +69,25 @@ let type_check_only f =
 (* Test compiler steps functions *)
 let print_knorm ast =
   Typechecker.type_check ast;
-  let res = Knorm.k_normalization ast in
+  let res = Knorm.normalize ast in
     print_endline (Knorm.to_string_with_type res)
 
 let print_alpha ast =
   Typechecker.type_check ast;
-  let res = Knorm.k_normalization ast in
+  let res = Knorm.normalize ast in
     let res = Alpha.conversion res in
     print_endline (Knorm.to_string res)
 
 let print_let_reduc ast =
   Typechecker.type_check ast;
-  let res = Knorm.k_normalization ast in
+  let res = Knorm.normalize ast in
     let res = Alpha.conversion res in
       let res = Reduction.reduction res in
       print_endline (Knorm.to_string res)
 
 let print_optim ast =
   Typechecker.type_check ast;
-  let res = Knorm.k_normalization ast in
+  let res = Knorm.normalize ast in
   let res = Alpha.conversion res in
   let res = Beta.reduction res in 
   let res = Reduction.reduction res in
@@ -96,7 +96,7 @@ let print_optim ast =
 
 let print_closure ast =
   Typechecker.type_check ast;
-  let res = Knorm.k_normalization ast in
+  let res = Knorm.normalize ast in
     let res = Alpha.conversion res in
       let res = Reduction.reduction res in
         let res = Closure.closure res in
@@ -132,7 +132,7 @@ let iter_optim ast =
 let print_asml f =
   let ast = get_ast f in
     Typechecker.type_check ast;              (* Typechecking *)
-    let ast = Knorm.k_normalization ast in   (* K-normalization *)
+    let ast = Knorm.normalize ast in   (* K-normalization *)
     let ast = Alpha.conversion ast in        (* Alpha-conversion *)
     let ast = iter_optim ast in              (* Optimisations *)
     let ast = Closure.closure ast in         (* Closure conversion *)
@@ -145,7 +145,7 @@ let print_asml f =
 let main (inp:string) (out:string) : unit = 
   let ast = get_ast inp in
     Typechecker.type_check ast;              (* Typechecking *)
-    let ast = Knorm.k_normalization ast in   (* K-normalization *)
+    let ast = Knorm.normalize ast in   (* K-normalization *)
     let ast = Alpha.conversion ast in        (* Alpha-conversion *)
     let ast = iter_optim ast in              (* Optimisations *)
     let ast = Closure.closure ast in         (* Closure conversion *)

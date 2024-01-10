@@ -19,7 +19,16 @@ type environment = (Id.t * Type.t) list
 (* default environment *)
 let predef:environment = [
   ("print_int", Type.Fun ([Type.Int], Type.Unit)); 
-  ("print_float", Type.Fun ([Type.Float], Type.Unit))
+  ("print_float", Type.Fun ([Type.Float], Type.Unit));
+  ("print_newline", Type.Fun([Type.Unit], Type.Unit));
+  ("sin", Type.Fun([Type.Float], Type.Float));
+  ("cos", Type.Fun([Type.Float], Type.Float));
+  ("sqrt", Type.Fun([Type.Float], Type.Float));
+  ("abs", Type.Fun([Type.Int], Type.Int));
+  ("abs_float", Type.Fun([Type.Float], Type.Float));
+  ("int_of_float", Type.Fun([Type.Float], Type.Int));
+  ("float_of_int", Type.Fun([Type.Int], Type.Float));
+  ("truncate", Type.Fun([Type.Float], Type.Int))
 ]
 
 let rec is_prefef_fun f_name list =
