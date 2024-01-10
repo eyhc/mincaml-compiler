@@ -34,118 +34,135 @@ type knorm_t =
 and fundef = {name : Id.t * Type.t; args : (Id.t * Type.t) list; body : knorm_t }
 
 
+(* détermine le type d'une expression dans l'environnement env *)
+let rec get_type (ast:knorm_t) (env:(Id.t * Type.t) list) : Type.t =
+  match ast with
+  | Unit -> Unit
+  | Int _ | Add _ | Sub _ | Neg _ -> Int
+  | Float _ | FAdd _ | FSub _ | FMul _ | FDiv _ | FNeg _ -> Float
+
+  | Var id ->
+    (try
+      (snd (List.find (fun (x,y) -> x = id) env))
+    with Not_found -> failwith (sprintf "Knorm failed -> Not found var : %s" id))
+
+  | IfEq (c, e1, e2) -> get_type e2 env
+  | IfLE (c, e1, e2) -> get_type e2 env
+  | Let (id, e1 , e2) -> get_type e2 (id::env)
+
+  | LetRec (fd, e) -> get_type e (fd.name::env)
+  | App (f, args) -> 
+    let t = get_type (Var f) env in
+      (match Type.simplify t with 
+      | Fun(_,t) -> t
+      | _ -> failwith (sprintf "Knorm failed -> %s is not a function" f))
+
+  | LetTuple (l, v, e) -> get_type e (l @ env)
+  | Tuple l -> Tuple(List.map (fun x -> get_type (Var x) env) l)
+
+  | Array (x, y) -> Array(get_type (Var y) env)
+  | Get (x, y) -> 
+    let t = get_type (Var x) env in
+      (match Type.simplify t with
+      | Array(t') -> t'
+      | _ -> failwith (sprintf "Knorm failed -> %s is not an array" x))
+  | Put (x, y, z) -> Unit
+
+
 (* insertion d'une expression let si besoin
  * pour une expression k-normalisé e de type t
  * où l'application de k sur une nouvelle variable x (Id.t) 
  * donne une expression e' (k-normalisé) dans le pattern (let x:t = e in e')
  *)
-let insert_let ((e,t):knorm_t*Type.t) (k:Id.t -> knorm_t) : knorm_t =
+let insert_let (e:knorm_t) (env:(Id.t * Type.t) list) (k:Id.t -> knorm_t) : knorm_t =
   match e with
   | Var x -> k x
   | _ ->
     let x = Id.genid () in
       let e' = k x in
-        Let((x, t), e, e')
+        Let((x, get_type e env), e, e')
 
+
+(***************************************************************)
+(* Fonction principale de normalisation *)
 
 (* CF equations de la section 4.3 de l'article *)
-let k_normalization (exp:Syntax.t) : knorm_t =
+let normalize (exp:Syntax.t) : knorm_t =
+  let rec norm (exp:Syntax.t) (env:(Id.t * Type.t) list) : knorm_t =
+  (* applique deux fois insert_let *)
+  let insert_2x e1 e2 f = insert_let (norm e1 env) env
+    (fun x -> 
+      let k = norm e2 env in insert_let k env (fun y -> f x y))
+  in
 
-  (* norm retourne l'expression k-normalisé correspondant à ast 
-     ainsi que son type (nécessaire en cas d'insertion d'expression let) *)
-  (* l'environnement contient le type des variables *)
-  let rec norm (exp:Syntax.t) (env:(Id.t*Type.t) list) : knorm_t * Type.t =
+  (* applique insert let sur une liste *)
+  let insert_nx (le:Syntax.t list) (f:Id.t list -> knorm_t) : knorm_t =
+    (* le : liste d'expression non traitées; res liste de variables (correspondantes) *)
+    let rec insert_nx_rec le f res =
+      (match le with
+      | [] -> f (List.rev res) (* res est dans le mauvais ordre *)
+      | e::l -> let k = norm e env in
+        insert_let k env (fun xi -> insert_nx_rec l f (xi::res)))
+    in insert_nx_rec le f []
+  in
 
-    (* applique deux fois insert_let *)
-    let insert_2x e1 e2 f = insert_let (norm e1 env) 
-        (fun x -> insert_let (norm e2 env) (fun y -> f x y))
-    in
+  match exp with
+  | Unit -> Unit
+  | Int i -> Int i
+  | Float f -> Float f
+  | Bool b -> Int (Bool.to_int b)
+  | Var id -> Var id
 
-    (* applique insert let sur une liste *)
-    let insert_nx (le:Syntax.t list) (f:Id.t list -> knorm_t) : knorm_t =
-      (* le : liste d'expression non traitées; res liste de variables (correspondantes) *)
-      let rec insert_nx_rec le f res =
-        (match le with
-        | [] -> f (List.rev res) (* res est dans le mauvais ordre *)
-        | e::l -> insert_let (norm e env) (fun xi -> insert_nx_rec l f (xi::res)))
-      in insert_nx_rec le f []
-    in
+  | Add (e1, e2) -> insert_2x e1 e2 (fun x y -> Add (x,y))
+  | Sub (e1, e2) -> insert_2x e1 e2 (fun x y -> Sub (x,y))
+  | Neg e -> 
+    let k = norm e env in insert_let k env (fun x -> Neg x)
 
-    (match exp with
-    | Unit -> Unit, Unit
-    | Int i -> Int i, Int
-    | Float f -> Float f, Float
-    | Bool b -> Int (Bool.to_int b), Int
+  | FNeg e -> 
+    let k = norm e env in insert_let k env (fun x -> FNeg x)
+  | FAdd (e1, e2) -> insert_2x e1 e2 (fun x y -> FAdd (x,y))
+  | FSub (e1, e2) -> insert_2x e1 e2 (fun x y -> FSub (x,y))
+  | FMul (e1, e2) -> insert_2x e1 e2 (fun x y -> FMul (x,y))
+  | FDiv (e1, e2) -> insert_2x e1 e2 (fun x y -> FDiv (x,y))
 
-    | Var id -> Var id,
-      (try
-        (snd (List.find (fun (x,y) -> x = id) env))
-      with Not_found -> failwith (sprintf "Knorm failed -> Not found : %s" id))
+  | Not e -> norm (If (Eq(e, Bool true), Bool false, Bool true)) env
+  | Eq (e1, e2) -> norm (If(exp, Bool true, Bool false)) env
+  | LE (e1, e2) -> norm (If(exp, Bool true, Bool false)) env
+  | If (e1, e2, e3) -> 
+    (match e1 with
+    | Not x -> norm (If(x, e3, e2)) env
+    | Eq (e11, e12) -> 
+      let k2 = norm e2 env and k3 = norm e3 env in 
+        insert_2x e11 e12 (fun x y -> IfEq((x,y), k2, k3))
+    | LE (e11, e12) ->
+      let k2 = norm e2 env and k3 = norm e3 env in 
+        insert_2x e11 e12 (fun x y -> IfEq((x,y), k2, k3))
+    | _ -> norm (If (Eq (e1, Bool false), e3, e2)) env)
 
-    | Add (e1, e2) -> (insert_2x e1 e2 (fun x y -> Add (x,y))), Int
-    | Sub (e1, e2) -> (insert_2x e1 e2 (fun x y -> Sub (x,y))), Int
-    | Neg e -> (insert_let (norm e env) (fun x -> Neg x)), Int
+  | Let (id, e1 , e2) -> Let(id, norm e1 env, norm e2 (id::env))
 
-    | FNeg e -> (insert_let (norm e env) (fun x -> FNeg x)), Float
-    | FAdd (e1, e2) -> (insert_2x e1 e2 (fun x y -> FAdd (x,y))), Float
-    | FSub (e1, e2) -> (insert_2x e1 e2 (fun x y -> FSub (x,y))), Float
-    | FMul (e1, e2) -> (insert_2x e1 e2 (fun x y -> FMul (x,y))), Float
-    | FDiv (e1, e2) -> (insert_2x e1 e2 (fun x y -> FDiv (x,y))), Float
+  | LetRec (fd, e) -> 
+    let kbody = norm fd.body (fd.name::fd.args @ env) in
+      let ke = norm e (fd.name::env) in
+        LetRec ({name = fd.name; args = fd.args; body = kbody}, ke)
+  | App (e, le) -> 
+    let k = norm e env in
+      insert_let k env (fun x -> insert_nx le (fun l -> App(x, l)))
 
-    | Not e -> norm (If (Eq(e, Bool true), Bool false, Bool true)) env
-    | Eq (e1, e2) -> norm (If(exp, Bool true, Bool false)) env
-    | LE (e1, e2) -> norm (If(exp, Bool true, Bool false)) env
-    | If (e1, e2, e3) -> 
-      (match e1 with
-      | Not x -> norm (If(x, e3, e2)) env
-      | Eq (e11, e12) -> 
-        let k2,_ = norm e2 env and k3,t = norm e3 env in 
-          insert_2x e11 e12 (fun x y -> IfEq((x,y), k2, k3)),t
-      | LE (e11, e12) ->
-        let k2,_ = norm e2 env and k3,t = norm e3 env in 
-          insert_2x e11 e12 (fun x y -> IfEq((x,y), k2, k3)),t
-      | _ -> norm (If (Eq (e1, Bool false), e3, e2)) env)
+  | LetTuple (l, e1, e2) -> 
+    let k1 = norm e1 env and k2 = norm e2 (l @ env) in
+      insert_let k1 env (fun x -> LetTuple (l, x, k2))
+  | Tuple l -> insert_nx l (fun l -> Tuple(l))
 
-    | Let (id, e1 , e2) ->
-      let (k1, t1) = norm e1 env in
-        let (k2, t2) = norm e2 (id::env) in
-          Let(id, k1, k2), t2
-
-    | LetRec (fd, e) -> 
-      let e1,t1 = norm fd.body (fd.name::fd.args @ env) in
-        let e2,t2 = norm e (fd.name::env) in
-          LetRec ({name = fd.name; args = fd.args; body = e1}, e2), t2
-    | App (e, le) ->
-      let (e',t') = norm e env in
-        (match Type.simplify t' with
-        | Fun(l, t) ->
-          insert_let (e',t') (fun x -> (insert_nx le (fun lx -> App(x,lx)))),t
-        | _ -> failwith "knormalization failed : App with non functional type")
-
-    | LetTuple (l, e1, e2) -> 
-      let k,t = norm e2 (l @ env) in
-        (insert_let (norm e1 env) (fun x -> LetTuple(l, x, k))), t
-    | Tuple l -> insert_nx l (fun l -> Tuple l), Tuple (List.map (fun x -> snd (norm x env)) l)
-
-    | Array (e1, e2) ->
-      let k2,t2 = norm e2 env in
-        insert_let (norm e1 env) (fun x -> insert_let (k2,t2) (fun y -> Array (x, y))),Array t2
-    | Get (e1, e2) -> 
-      let k1,t1 = norm e1 env in
-        (match Type.simplify t1 with
-        | Array t -> 
-          insert_let (k1,t1) (fun x -> insert_let (norm e2 env) (fun y -> Get(x, y))), t
-        | _ -> failwith "knormalization failed : Get of non array type")
-    | Put (e1, e2, e3) ->
-      let k1,t1 = norm e1 env in
-        (match Type.simplify t1 with
-        | Array t -> insert_let (k1,t1) (fun x -> insert_2x e2 e3 (fun y z -> Put(x, y, z))), t
-        | _ -> failwith "knormalization failed : Put of non array type")
-    )
-  
-  in let res,_ = norm exp Typechecker.predef in res
+  | Array (e1, e2) -> insert_2x e1 e2 (fun x y -> Array (x, y))
+  | Get (e1, e2) -> insert_2x e1 e2 (fun x y -> Get (x, y))
+  | Put (e1, e2, e3) ->
+    let k1 = norm e1 env in
+      insert_let k1 env (fun x -> insert_2x e2 e3 (fun y z -> Put(x, y, z)))
+  in norm exp Typechecker.predef
 
 
+(*********************************************************)
 (* fonctions to_string : dans l'idée de Syntax.to_string *)
 let rec to_string_rec (with_type:bool) (k:knorm_t) : string =
   let to_string_rec = to_string_rec with_type in
