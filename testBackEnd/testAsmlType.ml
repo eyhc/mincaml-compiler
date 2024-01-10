@@ -67,6 +67,7 @@ let rec count_lets_in_reg_function : reg_function -> int =
       Printf.sprintf "%s:" end_label :: []
     | Int n -> [Printf.sprintf "mov r0, #%d" n]
     | Reg reg -> [Printf.sprintf "mov r0, %s" reg]
+    | Call (func_name) -> [Printf.sprintf "bl %s" func_name;]
     | Unit -> []
     | _ -> ["Error"])
   | Store (Reg reg, mem) -> [Printf.sprintf "str %s, %s" reg mem]
@@ -99,7 +100,7 @@ let () =
   let result_asm_reg =
     generate_asm_reg
     [Fun
-    {name = "Main";
+    {name = "_";
      body =
       [Let ("r4", Int 1); Store (Reg "r4", "fp - 4"); Let ("r5", Int 2);
        Store (Reg "r5", "fp - 8"); Let ("r6", Int 8); Let ("r4", Int 14);
@@ -107,15 +108,15 @@ let () =
        Store (Reg "r5", "fp - 16"); Load ("fp - 4", Reg "r5");
        Let ("r0", Reg "r6"); Let ("r1", Reg "r4"); Let ("r2", Reg "r5");
        Load ("fp - 12", Reg "r3"); Load ("fp - 16", Reg "r4");
-       Exp (Call "bonjour")]} ;
-          Fun 
-          { name = "_f";
-          body =
-            [Let ("r4", Reg "r0"); Store (Reg "r4", "[fp - 4]");
-            Exp (Int 5)
-            ]
-          };
-        ]
+       Exp (Call "_f")]} ;
+        Fun 
+        { name = "_f";
+        body =
+          [Let ("r4", Reg "r0"); Store (Reg "r4", "[fp - 4]");
+          Exp (Int 5)
+          ]
+        };
+      ]
   in
   let output_file_reg = "output.asm" in
   let oc_reg = open_out output_file_reg in
