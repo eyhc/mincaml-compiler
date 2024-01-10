@@ -136,7 +136,7 @@ let normalize (exp:Syntax.t) : knorm_t =
         insert_2x e11 e12 (fun x y -> IfEq((x,y), k2, k3))
     | LE (e11, e12) ->
       let k2 = norm e2 env and k3 = norm e3 env in 
-        insert_2x e11 e12 (fun x y -> IfEq((x,y), k2, k3))
+        insert_2x e11 e12 (fun x y -> IfLE((x,y), k2, k3))
     | _ -> norm (If (Eq (e1, Bool false), e3, e2)) env)
 
   | Let (id, e1 , e2) -> Let(id, norm e1 env, norm e2 (id::env))

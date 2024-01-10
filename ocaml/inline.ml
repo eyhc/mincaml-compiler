@@ -82,7 +82,6 @@ let expansion (ast:Knorm.knorm_t) : Knorm.knorm_t =
     | LetRec (fd, e) -> 
       let in_body = inline fd.body env in
         let fdeep = deep in_body [(fst fd.name)] in
-          let _ = print_endline (Printf.sprintf "truc=%d" fdeep) in
           if fdeep <= !max_deep then inline e (fd::env)
           else LetRec({name = fd.name; args = fd.args; body = in_body}, inline e env)
     | App (f, vars) -> 

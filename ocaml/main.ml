@@ -132,28 +132,28 @@ let iter_optim ast =
 let print_asml f =
   let ast = get_ast f in
     Typechecker.type_check ast;              (* Typechecking *)
-    let ast = Knorm.normalize ast in   (* K-normalization *)
+    let ast = Knorm.normalize ast in         (* K-normalization *)
     let ast = Alpha.conversion ast in        (* Alpha-conversion *)
     let ast = iter_optim ast in              (* Optimisations *)
     let ast = Closure.closure ast in         (* Closure conversion *)
-    (*et asml = Asml.generation ast in*)        (* ASML generation *)
+    let asml = Asml.generation ast in        (* ASML generation *)
                                              (* Immediate optimisation *)
-    print_endline (Closure.to_string ast)      (* Displaying *)
+    print_endline (Asml.to_string asml)      (* Displaying *)
 
 
 (* Compile code file f to arm (32?) *)
 let main (inp:string) (out:string) : unit = 
   let ast = get_ast inp in
     Typechecker.type_check ast;              (* Typechecking *)
-    let ast = Knorm.normalize ast in   (* K-normalization *)
+    let ast = Knorm.normalize ast in         (* K-normalization *)
     let ast = Alpha.conversion ast in        (* Alpha-conversion *)
     let ast = iter_optim ast in              (* Optimisations *)
     let ast = Closure.closure ast in         (* Closure conversion *)
-    (*let asml = Asml.generation ast in*)        (* ASML generation *)
+    let asml = Asml.generation ast in        (* ASML generation *)
                                              (* Immediate optimisation *)
                                              (* ARM generation *)
     ();                                      (* Saving result in file *)
-    print_endline (Closure.to_string ast)
+    print_endline (Asml.to_string asml)
 
 
 (* MAIN *)
