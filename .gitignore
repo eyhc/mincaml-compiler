@@ -4,3 +4,6 @@ ocaml/.vscode/
 ocaml/_build/
 .vscode
 */*.mml
+tests/gen-code/*.actual
+tests/gen-code/*.asml
+resultats_tests.txt
