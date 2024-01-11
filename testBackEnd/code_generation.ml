@@ -79,10 +79,10 @@ and generate_asm_fun_internal : reg_function -> string list = fun { name; body }
   [Printf.sprintf "%s:" name] @ generate_prologue size @ List.concat (List.map generate_asm_regt body) @ generate_epilogue
 
 and generate_prologue size =
-  ["add sp, sp, #-4"; "str fp, [sp]"; "add fp, sp, #0"; "add sp, sp, #-" ^ string_of_int (size * 4)]
+  ["push {fp, lr}"; "add fp, sp, #0"; "add sp, sp, #-" ^ string_of_int (size * 4)]
 
 and generate_epilogue =
-  ["add sp, fp, #0"; "ldr fp, [sp]"; "add sp, sp, #4"; "bx lr"]
+  ["add sp, fp, #0"; "pop {fp, lr}"; "bx lr"]
 
 let generate_asm_reg (defs: letregdef list) : string list =
   match defs with
@@ -95,7 +95,8 @@ let generate_asm_reg (defs: letregdef list) : string list =
         generate_asm_internal (acc @ asm_hd) tl
     in
     let asm_code = generate_asm_internal [] defs in
-    [".text"; ".global main"] @ asm_code
+    [".data"; "f_float: .asciz \"%f\""; "f_int: .asciz \"%d\""; "f_newline: .asciz \"\\n\"" ;".text"; ".global main"]
+     @ asm_code
 
 let () =
   let result_asm_reg =
@@ -109,6 +110,7 @@ let () =
           Store (Reg "r5", "[fp , #-8]"); Load ("[fp , #-4]", Reg "r5");
           Load ("[fp , #-8]", Reg "r4"); Store (Reg "r4", "[fp , #-8]");
           Store (Reg "r5", "[fp , #-4]");
+          Exp(If("le", ("r4", Reg "r5"), [Let ("r4", Int 1)], [Let ("r4", Int 2)]));
           Let ("r5", Add ("r5", Int 5)); Let ("r5", Add ("r5", Reg "r4"));
           Store (Reg "r5", "[fp , #-4]");
           Let ("r5", Call("_f"))
