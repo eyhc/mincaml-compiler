@@ -267,7 +267,7 @@ let parcours asml =
         let i = parcours_id_or_im i_o_s in
         let a1 = !(parcours_asmt asmt1 (ref [])) in
         let a2 = !(parcours_asmt asmt2 (ref [])) in
-        If ("ge",(s1, i), a1, a)
+        If ("ge",(s1, i), a1, a2)
     | _ -> Unit
 
   and parcours_asml_list asml_list =
@@ -275,7 +275,7 @@ let parcours asml =
     | Main hd :: tl -> 
         let new_func : reg_function = {
           name = "main"; 
-          body = !(parcours_asmt hd (ref []));
+          body = !(parcours_asmt hd (ref [])) @ [Let ("r0", Int 0)];
         } in 
         new_body:= !new_body @ [Fun new_func];
         parcours_asml_list tl 
@@ -298,7 +298,12 @@ let rec print_reg_expr reg_expr =
       Printf.printf "))";
   | Call (name) ->
       Printf.printf "Call(%s)" name 
-  | If (_,_,_,_) -> Printf.printf  "if()"
+  | If (s,(s1,i_o_s),a1,a2) -> 
+    Printf.printf  "If%s(" s;
+    Printf.printf  "%s," s1;
+    print_reg_expr i_o_s;
+    Printf.printf  ") then \n";
+
   | Reg s -> Printf.printf  "Reg %s" s
   | Unit -> Printf.printf  "Unit"
 
