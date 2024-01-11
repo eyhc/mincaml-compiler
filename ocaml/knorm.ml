@@ -174,11 +174,11 @@ let rec to_string_rec (with_type:bool) ?(p: string="") (k:knorm_t) : string =
     sprintf "%sif %s %s %s then\n%s\n%selse\n%s" p a op b (to_string_rec ~p:(p^tab) th) p (to_string_rec ~p:(p^tab) els)
   in
   match k with
-  | Var b -> Id.to_string b
-  | Unit -> "()"
-  | Int i -> string_of_int i
-  | Float f -> sprintf "%.2f" f
-  | Neg b -> sprintf "(- %s)" (Id.to_string b)
+  | Var b -> p ^Id.to_string b
+  | Unit -> p ^ "()"
+  | Int i -> p ^ string_of_int i
+  | Float f -> sprintf "%s%.2f" p f
+  | Neg b -> sprintf "%s(- %s)" p (Id.to_string b)
   | Add (b1, b2) -> arithemic_op_to_string p b1 b2 "+"
   | Sub (b1, b2) -> arithemic_op_to_string p b1 b2 "-"
   | FNeg b -> sprintf "(-. %s)" (Id.to_string b)

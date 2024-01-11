@@ -56,11 +56,11 @@ let rec to_string ?(p: string = "") (exp: t): string =
     sprintf "%sif %s %s %s then\n%s\n%selse\n%s\n" p a op b (to_string ~p:(p^tab) th) p (to_string ~p:(p^tab) els)
   in
   match exp with
-  | Int i -> string_of_int i
-  | Var id -> Id.to_string id
+  | Int i -> p ^ string_of_int i
+  | Var id -> p ^ Id.to_string id
   | Neg a -> sprintf "-%s" (Id.to_string a)
-  | Add(a, b) -> arithemic_op_to_string p a "+" b
-  | Sub(a, b) -> arithemic_op_to_string p a "-" b
+  | Add(a, b) -> arithemic_op_to_string p a b "+"
+  | Sub(a, b) -> arithemic_op_to_string p a b "-"
   | IfEq((a, b), t, e) -> if_to_string p a b "=" t e
   | IfLE((a, b), t, e) -> if_to_string p a b "<=" t e
   | Let(id, value, next) -> sprintf "%slet %s = %s in\n%s" p (Id.to_string id) (to_string value) (to_string ~p:p next)
