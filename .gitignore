@@ -35,3 +35,5 @@ setup.log
 *.asm
 .vscode
 */*.mml
+*.s
+*/*.s

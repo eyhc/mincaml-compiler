@@ -31,7 +31,8 @@ type expr =
 | MEMGET of Id.t * id_or_imm
 | MEMASSIGN of Id.t * id_or_imm * Id.t
 | IFEQ of (Id.t*id_or_imm) * asmt * asmt
-| IFLE of (Id.t*id_or_imm) * asmt * asmt
+| IFLE of (Id.t * id_or_imm) * asmt * asmt
+| IFGE of (Id.t * id_or_imm) * asmt * asmt
 | IFFEQUAL of (Id.t*Id.t) * asmt * asmt
 | IFFLE of (Id.t*Id.t) * asmt * asmt
 | CALL of Id.l * Id.t list

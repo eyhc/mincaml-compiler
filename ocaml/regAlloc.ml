@@ -1,40 +1,5 @@
+open Asml
 
-type id_or_imm = Var of Id.t | Const of int
- 
-type expr =
-  | NOP (* Unit *)
-  | VAL of id_or_imm
-        (*  | LABEL of string (* nom de fonction *) *)
-  | NEG of Id.t (* A ajouter *)
-  | ADD of Id.t * id_or_imm (* c bon*)
-  | SUB of Id.t * id_or_imm (* c bon*)
-  | FNEG of Id.t
-  | FADD of Id.t * Id.t
-  | FSUB of Id.t * Id.t
-  | FMUL of Id.t * Id.t
-  | FDIV of Id.t * Id.t
-  | NEW of id_or_imm (* ? *)
-  | MEMGET of Id.t * id_or_imm 
-  | MEMASSIGN of Id.t * id_or_imm * Id.t
-  | IFEQ of (Id.t * id_or_imm) * asmt * asmt
-  | IFLE of (Id.t * id_or_imm) * asmt * asmt
-  | IFGE of (Id.t * id_or_imm) * asmt * asmt
-  | IFFEQUAL of (Id.t * Id.t) * asmt * asmt
-  | IFFLE of (Id.t * Id.t) * asmt * asmt
-  | CALL of Id.t * Id.t list
-  | CALLCLO of Id.t * Id.t list 
-                 
-and asmt =
-  | LET of Id.t * expr * asmt (* let t = exp in asmt *)
-  | EXP of expr
-
-type letdef =
-  | Main of asmt
-  | LetFloat of float
-  | LetLabel of Id.t * Id.t list * asmt
-
-type asml = letdef list 
-;;
 
   (* type pour la partie back-end *)
 type reg_expr =
@@ -58,7 +23,6 @@ type letregdef =
       
 and reg_function = {
   name : Id.t;
-  params : reg_expr list;
   body : regt list ;
 }
 ;;
@@ -253,12 +217,11 @@ let parcours asml =
       
     | _ -> Unit
 
-  and parcours_asml_list asml_list =[fp, #-4]
+  and parcours_asml_list asml_list =
     match asml_list with
     | Main hd :: tl -> 
         let new_func : reg_function = {
           name = "Main";
-          params = [];
           body = !(parcours_asmt hd (ref []));
         } in 
         new_body:= !new_body @ [Fun new_func];
@@ -314,11 +277,3 @@ let rec print_reg_function reg_function =
       print_reg_function tl
   | [] -> ()
 ;;
-
-
-let asml = [(Main (LET ("x", VAL (Const 1), (LET ("y", VAL (Const 2), (LET ("a", (VAL (Const 8)),
-                                                                            (LET ("b", VAL (Const 14), (LET ("i", VAL (Const 14),
-                                                                                                             EXP (CALL ("bonjour",["a";"z";"x";"b";"i"])))))))))))))];;
-
-let () = 
-print_reg_function(parcours asml)

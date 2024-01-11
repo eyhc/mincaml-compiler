@@ -15,6 +15,8 @@ let type_only = ref false and asml_only = ref false and parse_only = ref false
 let test = ref false 
 let knorm_only = ref false and alpha = ref false 
 and let_reduc = ref false and closure = ref false and optim = ref false
+and back_print = ref false
+
 
 (* -n_iter *)
 let n_iter_optim = ref 100
@@ -35,7 +37,8 @@ let speclist = [
   ("-alpha", Arg.Unit(fun () -> alpha :=true), "Alpha-reduction");
   ("-let", Arg.Unit(fun () -> let_reduc :=true), "Reduction of nested let-expression");
   ("-closure", Arg.Unit(fun () -> closure :=true), "Closure conversion");
-  ("-optim", Arg.Unit(fun () -> optim :=true), "test optimisation")
+  ("-optim", Arg.Unit(fun () -> optim :=true), "test optimisation");
+  ("-back", Arg.Unit(fun () -> back_print :=true), "Back code intermediaire")
 ]
 
 (* SHOW HELP IN TERM (-h option) *)
@@ -54,6 +57,12 @@ let get_ast file =
   (try
     Parser.exp Lexer.token (Lexing.from_channel inchan)
   with e -> (close_in inchan; raise e))
+
+let set_arm_file arm out_file =
+  let oc_reg = open_out out_file in
+    List.iter (fun instruction -> output_string oc_reg (instruction ^ "\n")) arm;
+  close_out oc_reg;
+  print_endline ("Results written to " ^ out_file)
 
 let print_ast f =
   let ast = get_ast f in
@@ -102,6 +111,29 @@ let print_closure ast =
         let res = Closure.closure res in
         print_endline (Closure.to_string res)
 
+let iter_optim ast =
+  let rec iter_rec ast n =
+    if n = 0 then ast
+    else
+      let a = Beta.reduction ast in          (* Beta reduction *)
+      let a = Reduction.reduction a in       (* Reduction of nested-let *)
+      let a = Inline.expansion a in          (* Inline expansion *)
+      (* Constant folding | Elim. unnecessary def *)
+      a (* to_do : ne plus itérérer si on atteint un point fixe *)
+  in iter_rec ast !n_iter_optim
+
+
+let print_back ast =
+  Typechecker.type_check ast;
+  let ast = Knorm.normalize ast in
+  let ast = Alpha.conversion ast in 
+  let ast = iter_optim ast in
+  let ast = Closure.closure ast in
+  let asml = Asml.generation ast in
+                                            (* Immediate optimisation *)
+  let b = RegAlloc.parcours asml in 
+  RegAlloc.print_reg_function b
+
 let print_test f =
   let ast = get_ast f in
     if !knorm_only then
@@ -114,19 +146,10 @@ let print_test f =
       print_let_reduc ast
     else if !closure then
       print_closure ast
+    else if !back_print then
+      print_back ast
     else
       print_endline "The function you want to test is missing ! Put the corresponding argument : -knorm; -alpha; -let; -closure"
-
-let iter_optim ast =
-  let rec iter_rec ast n =
-    if n = 0 then ast
-    else
-      let a = Beta.reduction ast in          (* Beta reduction *)
-      let a = Reduction.reduction a in       (* Reduction of nested-let *)
-      let a = Inline.expansion a in          (* Inline expansion *)
-      (* Constant folding | Elim. unnecessary def *)
-      a (* to_do : ne plus itérérer si on atteint un point fixe *)
-  in iter_rec ast !n_iter_optim
 
 (* Display asml of file f*)
 let print_asml f =
@@ -151,9 +174,9 @@ let main (inp:string) (out:string) : unit =
     let ast = Closure.closure ast in         (* Closure conversion *)
     let asml = Asml.generation ast in        (* ASML generation *)
                                              (* Immediate optimisation *)
-                                             (* ARM generation *)
-    ();                                      (* Saving result in file *)
-    print_endline (Asml.to_string asml)
+    let b = RegAlloc.parcours asml in           (* Register allocation *)                     
+    let arm = Generation.generate_asm_reg b in (* ARM generation *)
+    set_arm_file arm out                       (* Saving result in file *)
 
 
 (* MAIN *)
