@@ -25,30 +25,28 @@ and reg_function = {
   body : regt list ;
 }
 ;;
-
-let asml = [(Main (LET ("x", VAL (Const 1), (LET ("y", VAL (Const 2), (LET ("a", (VAL (Const 8)),
-                                                                            (LET ("b", VAL (Const 14), (LET ("i", VAL (Const 14),
-                                                                                                             EXP (CALL ("bonjour",["a";"z";"x";"b";"i"])))))))))))))];;
- 
-
-(* Fonctions pour print une hashtables composée de string string, une liste de string *)
 let print_hashtable my_hashtable =
   Hashtbl.iter (fun key value ->
-      Printf.printf "%s -> %s\n" key value  
+      Printf.printf "%s -> %s\n" key value  (* Remplacez 'string_of_int' par une conversion appropriée pour votre type 'a' *)
     ) my_hashtable;;
 let print_free my_list =
   List.iter (fun elem ->
-      Printf.printf "%s\n" elem  
+      Printf.printf "%s\n" elem  (* Remplacez '%s' par le format approprié pour le type réel de vos éléments *)
     ) my_list;;
+let print_intervals intervals =
+  List.iter (fun (key,start) ->
+      Printf.printf "(%s,(%s))\n" key start
+    ) intervals;; 
 
-(* Nombres de registres pour les variables locales *)
-let num_registers = 9;;
- 
-(* Hashmap des variables sur la pile avec leurs adresses, exemple : "x" -> "[fp, #4]" *)
+(* nombres de registres pour les variables locales *)
+let num_registers = 7;;
+
+(* hashmap des variables sur la pile avec leurs adresses exemple : "x" "FP - 4"  *)
 let var_in_stack = Hashtbl.create 0;;
-
-(* Hashmap des variables avec leurs registres associés, exemple : "x" -> "r4" *)
-let var_to_register = Hashtbl.create num_registers;;
+     (* parcours_asmt
+hashtable binding variable to register,
+a : r1 -> variable `a` is in register `r1` 
+*)
 
 
 let get_intervals_i asml = 
@@ -88,10 +86,10 @@ let get_intervals_i asml =
         i_intervals_expr (CALL (s,tl))
     | CALL (_, []) -> ()
     | IFEQ ((s,i_o_s) , asmt1, asmt2) | IFLE ((s,i_o_s) , asmt1, asmt2) | IFGE ((s,i_o_s) , asmt1, asmt2) -> 
-      i_intervals_string s;
-      i_intervals_id_or_imm i_o_s;
-      i_intervals_asmt asmt1;
-      i_intervals_asmt asmt2;
+        i_intervals_string s;
+        i_intervals_id_or_imm i_o_s;
+        i_intervals_asmt asmt1;
+        i_intervals_asmt asmt2;
     | _ when (List.length !list) = num_registers -> () 
     | _ -> ()
              (* and i_intervals asml =
@@ -134,9 +132,17 @@ let var_not_in_hash hashmap active =
     ) [] active 
 ;;
  
+let filter_hashtable_by_keys hashtable keys = 
+  let result_hashtable = Hashtbl.create (Hashtbl.length hashtable) in 
+  List.iter (fun key -> 
+      if Hashtbl.mem hashtable key then 
+        Hashtbl.add result_hashtable key (Hashtbl.find hashtable key) 
+    ) keys; 
+  result_hashtable 
+;;
 
 
-let store_load intervals body =
+let store_load intervals body var_to_register =
    (* a la premiere ligne hashtable est vide, on y met les 9 variables *)
   if (Hashtbl.length var_to_register) = 0 then begin 
     let rec add_hashmap n inter =
@@ -180,7 +186,7 @@ let store_load intervals body =
     ()
 ;; 
 
-let store_to_regs_params lst bd =
+let store_to_regs_params lst bd var_to_register=
   (*let params = Hashtbl.create 4 in*)
   let rec store lst count = 
     match lst with 
@@ -212,70 +218,85 @@ let premiers_elements l =
       | e :: ll -> final := !final @ [e];
           (npe ll (count + 1))
   in npe l 0; final
-;;
-
+;; 
 
 let parcours asml =
   let new_body = ref [] in 
-  let rec parcours_asmt asmt bd =
+  let rec parcours_asmt asmt bd var_to_register =
     match asmt with
     | LET (var1, var2, exp) -> 
         let active = get_intervals_i asmt in
-        store_load active bd;
-        bd := !bd @ [Let ((Hashtbl.find var_to_register var1), (parcours_expr var2 bd))];
-        parcours_asmt exp bd; 
+        store_load active bd var_to_register;
+        let r = Hashtbl.find var_to_register var1 in
+        let expr = parcours_expr var2 bd var_to_register in
+        bd := !bd @ [Let (r, expr)]; 
+        parcours_asmt exp bd var_to_register;
     | EXP expr -> 
         let active = get_intervals_i asmt in
-        store_load active bd;
-        bd := !bd @ [Exp (parcours_expr expr bd)];
-        bd
-  and parcours_id_or_im id_or_im =
+        store_load active bd var_to_register;
+        bd := !bd @ [Exp (parcours_expr expr bd var_to_register)];
+        bd 
+  and parcours_id_or_im id_or_im var_to_register =
     match id_or_im with
     | Const n -> Int n
-    | Var r ->  Reg (Hashtbl.find var_to_register r)
+    | Var r ->  Reg (Hashtbl.find var_to_register r) 
+    
                   
-  and parcours_expr expr bd =
+  and parcours_expr expr bd var_to_register =
     match expr with
     | VAL v -> 
-        parcours_id_or_im v
+        parcours_id_or_im v var_to_register
     | NEG s ->
         Neg (Hashtbl.find var_to_register s)
     | ADD (s, id_or_im) -> 
-        Add (Hashtbl.find var_to_register s, parcours_id_or_im id_or_im)
+        Add (Hashtbl.find var_to_register s, parcours_id_or_im id_or_im var_to_register)
     | SUB (s, id_or_im) -> 
-        Sub (Hashtbl.find var_to_register s, parcours_id_or_im id_or_im)
+        Sub (Hashtbl.find var_to_register s, parcours_id_or_im id_or_im var_to_register)
     | NOP -> Unit
     | CALL (s, ls) ->
         let active = premiers_elements ls in
-        store_load active bd; 
-        store_to_regs_params ls bd;
+        store_load active bd var_to_register; 
+        store_to_regs_params ls bd var_to_register;
         Call (s) 
     | IFEQ ((s,i_o_s) , asmt1, asmt2) -> 
         let s1 = Hashtbl.find var_to_register s in
-        let i = parcours_id_or_im i_o_s in
-        let a1 = !(parcours_asmt asmt1 (ref [])) in
-        let a2 = !(parcours_asmt asmt2 (ref [])) in
+        let i = parcours_id_or_im i_o_s var_to_register in
+        let active = get_intervals_i asmt1 in
+        let new_hash = filter_hashtable_by_keys var_to_register !active in
+        let a1 = !(parcours_asmt asmt1 (ref []) new_hash) in
+        let active = get_intervals_i asmt2 in
+        let new_hash1 = filter_hashtable_by_keys var_to_register !active in
+        let a2 = !(parcours_asmt asmt2 (ref []) new_hash1) in
         If ("eq",(s1, i), a1, a2)
     | IFLE ((s,i_o_s) , asmt1, asmt2) -> 
         let s1 = Hashtbl.find var_to_register s in
-        let i = parcours_id_or_im i_o_s in
-        let a1 = !(parcours_asmt asmt1 (ref [])) in
-        let a2 = !(parcours_asmt asmt2 (ref [])) in
+        let i = parcours_id_or_im i_o_s var_to_register in
+        let active = get_intervals_i asmt1 in
+        let new_hash = filter_hashtable_by_keys var_to_register !active in
+        let a1 = !(parcours_asmt asmt1 (ref []) new_hash) in
+        let active = get_intervals_i asmt2 in
+        let new_hash1 = filter_hashtable_by_keys var_to_register !active in
+        let a2 = !(parcours_asmt asmt2 (ref []) new_hash1) in
         If ("le",(s1, i), a1, a2)
     | IFGE ((s,i_o_s) , asmt1, asmt2) -> 
         let s1 = Hashtbl.find var_to_register s in
-        let i = parcours_id_or_im i_o_s in
-        let a1 = !(parcours_asmt asmt1 (ref [])) in
-        let a2 = !(parcours_asmt asmt2 (ref [])) in
+        let i = parcours_id_or_im i_o_s var_to_register in
+        let active = get_intervals_i asmt1 in
+        let new_hash = filter_hashtable_by_keys var_to_register !active in
+        let a1 = !(parcours_asmt asmt1 (ref []) new_hash) in
+        let active = get_intervals_i asmt2 in
+        let new_hash1 = filter_hashtable_by_keys var_to_register !active in
+        let a2 = !(parcours_asmt asmt2 (ref []) new_hash1) in
         If ("ge",(s1, i), a1, a2)
     | _ -> Unit
 
   and parcours_asml_list asml_list =
     match asml_list with
     | Main hd :: tl -> 
+        let var_to_register = Hashtbl.create 0 in
         let new_func : reg_function = {
           name = "main"; 
-          body = !(parcours_asmt hd (ref [])) @ [Let ("r0", Int 0)];
+          body = !(parcours_asmt hd (ref []) var_to_register);
         } in 
         new_body:= !new_body @ [Fun new_func];
         parcours_asml_list tl 
@@ -298,16 +319,18 @@ let rec print_reg_expr reg_expr =
       Printf.printf "))";
   | Call (name) ->
       Printf.printf "Call(%s)" name 
-  | If (s,(s1,i_o_s),a1,a2) -> 
-    Printf.printf  "If%s(" s;
-    Printf.printf  "%s," s1;
-    print_reg_expr i_o_s;
-    Printf.printf  ") then \n";
-
+  | If (s,(s1,ios),asmt1,asmt2) -> 
+    Printf.printf "If%s (%s," s s1;
+    print_reg_expr ios;
+    Printf.printf ") then \n";
+  (*  print_regtlist asmt1;*)
+    Printf.printf "\n else \n";
+  (* print_regtlist asmt2;*)
+    Printf.printf "\n";
   | Reg s -> Printf.printf  "Reg %s" s
   | Unit -> Printf.printf  "Unit"
 
-and print_regt  regt =
+  let print_regt  regt =
   match regt with
   | Let (s, expr) -> Printf.printf "(Let (%s," s ;
       print_reg_expr expr;
@@ -332,3 +355,19 @@ let rec print_reg_function reg_function =
       print_reg_function tl
   | [] -> ()
 ;;
+
+let asml = [(Main (LET ("x", VAL (Const 1), (LET ("y", VAL (Const 2), (LET ("a", (VAL (Const 8)),
+                                                                            (LET ("b", VAL (Const 14), (LET ("i", VAL (Const 14),
+                                                                                                             EXP (CALL ("bonjour",["a";"z";"x";"b";"i"])))))))))))))];;
+
+
+let b = [ 
+  (Main (LET ("x", VAL (Const 5), 
+              (LET ("y", VAL (Const 3), 
+                    EXP (IFLE (("x", Var "y"), 
+                               EXP (CALL ("bjr",["x"])), 
+                               (LET ("c", (VAL (Const 9)), 
+                                     (LET ("d", VAL (Const 5), 
+                                           (EXP (IFGE (("c", Var "d"), EXP (CALL ("bjr",["c"])), EXP (CALL ("bjr",["d"])) 
+                                                      )))))))))))))) 
+] ;;
