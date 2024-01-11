@@ -94,31 +94,39 @@ let generate_asm_reg (defs: letregdef list) : string list =
         let asm_hd = match hd with Fun f -> generate_asm_fun_internal f in
         generate_asm_internal (acc @ asm_hd) tl
     in
-    generate_asm_internal [] defs
+    let asm_code = generate_asm_internal [] defs in
+    [".text"; ".global main"] @ asm_code
 
 let () =
   let result_asm_reg =
     generate_asm_reg
     [Fun
-    {name = "_";
-     body =
-      [Let ("r4", Int 1); Store (Reg "r4", "fp - 4"); Let ("r5", Int 2);
-       Store (Reg "r5", "fp - 8"); Let ("r6", Int 8); Let ("r4", Int 14);
-       Store (Reg "r4", "fp - 12"); Let ("r5", Int 14);
-       Store (Reg "r5", "fp - 16"); Load ("fp - 4", Reg "r5");
-       Let ("r0", Reg "r6"); Let ("r1", Reg "r4"); Let ("r2", Reg "r5");
-       Load ("fp - 12", Reg "r3"); Load ("fp - 16", Reg "r4");
-       Exp (Call "_f")]} ;
-        Fun 
-        { name = "_f";
+      {
+        name = "main";
         body =
-          [Let ("r4", Reg "r0"); Store (Reg "r4", "[fp - 4]");
-          Exp (Int 5)
-          ]
-        };
-      ]
+        [
+          Let ("r4", Int 1); Store (Reg "r4", "[fp , #-4]"); Let ("r5", Int 2);
+          Store (Reg "r5", "[fp , #-8]"); Load ("[fp , #-4]", Reg "r5");
+          Load ("[fp , #-8]", Reg "r4"); Store (Reg "r4", "[fp , #-8]");
+          Store (Reg "r5", "[fp , #-4]");
+          Let ("r5", Add ("r5", Int 5)); Let ("r5", Add ("r5", Reg "r4"));
+          Store (Reg "r5", "[fp , #-4]");
+          Let ("r5", Call("_f"))
+        ]
+      };
+
+      Fun
+      {
+        name = "_f";
+        body =
+        [
+          Let ("r0", Add ("r5", Int 5))
+        ]
+      }
+
+    ]
   in
-  let output_file_reg = "output.asm" in
+  let output_file_reg = "output.s" in
   let oc_reg = open_out output_file_reg in
   List.iter (fun instruction -> output_string oc_reg (instruction ^ "\n")) result_asm_reg;
   close_out oc_reg;
