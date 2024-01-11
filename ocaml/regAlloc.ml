@@ -348,10 +348,3 @@ let rec print_reg_function reg_function =
       print_reg_function tl
   | [] -> ()
 ;;
-
-let asml = [(Main (LET ("x", VAL (Const 1), (LET ("y", VAL (Const 2), (LET ("a", (VAL (Const 8)),
-                                                                            (LET ("b", VAL (Const 14), (LET ("i", VAL (Const 14),
-                                                                                                             EXP (CALL ("bonjour",["a";"z";"x";"b";"i"])))))))))))))];;
- 
-let () =
-print_reg_function (parcours asml)

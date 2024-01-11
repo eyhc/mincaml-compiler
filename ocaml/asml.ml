@@ -148,6 +148,9 @@ let rec to_string_exp (e:expr) =
   | IFLE ((v, vd), a1, a2) ->
     let sa1 = to_string_asmt a1 and sa2 = to_string_asmt a2 in
       sprintf "(if %s <= %s then\n%s\nelse\n%s)" (Id.to_string v) (to_string_id_imm vd) sa1 sa2
+  | IFGE ((v, vd), a1, a2) ->
+    let sa1 = to_string_asmt a1 and sa2 = to_string_asmt a2 in
+      sprintf "(if %s >= %s then\n%s\nelse\n%s)" (Id.to_string v) (to_string_id_imm vd) sa1 sa2
   | IFFEQUAL ((v, v2), a1, a2) ->
     let sa1 = to_string_asmt a1 and sa2 = to_string_asmt a2 in
       sprintf "(if %s =. %s then\n%s\nelse\n%s)" (Id.to_string v) (Id.to_string v2) sa1 sa2
