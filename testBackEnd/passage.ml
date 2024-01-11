@@ -1,44 +1,49 @@
+
 type id_or_imm = Var of Id.t | Const of int
-
+ 
 type expr =
-| NOP
-| VAL of id_or_imm
-| LABEL of Id.l
-| NEG of Id.t
-| ADD of Id.t * id_or_imm
-| SUB of Id.t * id_or_imm
-| FNEG of Id.t
-| FADD of Id.t * Id.t
-| FSUB of Id.t * Id.t
-| FMUL of Id.t * Id.t
-| FDIV of Id.t * Id.t
-| NEW of id_or_imm
-| MEMGET of Id.t * id_or_imm
-| MEMASSIGN of Id.t * id_or_imm * Id.t
-| IFEQ of (Id.t*id_or_imm) * asmt * asmt
-| IFLE of (Id.t*id_or_imm) * asmt * asmt
-| IFFEQUAL of (Id.t*Id.t) * asmt * asmt
-| IFFLE of (Id.t*Id.t) * asmt * asmt
-| CALL of Id.l * Id.t list
-| CALLCLO of Id.t * Id.t list
+  | NOP (* Unit *)
+  | VAL of id_or_imm
+        (*  | LABEL of string (* nom de fonction *) *)
+  | NEG of Id.t (* A ajouter *)
+  | ADD of Id.t * id_or_imm (* c bon*)
+  | SUB of Id.t * id_or_imm (* c bon*)
+  | FNEG of Id.t
+  | FADD of Id.t * Id.t
+  | FSUB of Id.t * Id.t
+  | FMUL of Id.t * Id.t
+  | FDIV of Id.t * Id.t
+  | NEW of id_or_imm (* ? *)
+  | MEMGET of Id.t * id_or_imm 
+  | MEMASSIGN of Id.t * id_or_imm * Id.t
+  | IFEQ of (Id.t * id_or_imm) * asmt * asmt
+  | IFLE of (Id.t * id_or_imm) * asmt * asmt
+  | IFGE of (Id.t * id_or_imm) * asmt * asmt
+  | IFFEQUAL of (Id.t * Id.t) * asmt * asmt
+  | IFFLE of (Id.t * Id.t) * asmt * asmt
+  | CALL of Id.t * Id.t list
+  | CALLCLO of Id.t * Id.t list 
+                 
 and asmt =
-| LET of Id.t * expr * asmt (* let t = exp in asmt *)
-| EXP of expr
-and letdef =
-| Main of asmt
-| LetFloat of float
-| LetLabel of Id.l * Id.t list * asmt
-and asml = letdef list
+  | LET of Id.t * expr * asmt (* let t = exp in asmt *)
+  | EXP of expr
 
-(* type pour la partie back-end *)
+type letdef =
+  | Main of asmt
+  | LetFloat of float
+  | LetLabel of Id.t * Id.t list * asmt
+
+type asml = letdef list 
+;;
+
+  (* type pour la partie back-end *)
 type reg_expr =
   | Int of int 
   | Neg of Id.t
   | Add of Id.t * reg_expr
   | Sub of Id.t * reg_expr
-  | Assign of Id.t * reg_expr
-  | Call of Id.l 
-
+  | Call of Id.t
+  | If of Id.l * (Id.t*reg_expr) * regt list * regt list
   | Reg of Id.t
   | Unit
 
@@ -48,18 +53,17 @@ and regt=
   | Store of reg_expr * Id.t 
   | Load of Id.t * reg_expr 
       
-and letregdef = 
+type letregdef = 
   | Fun of reg_function
-  
+      
 and reg_function = {
-  name : Id.l;
+  name : Id.t;
+  params : reg_expr list;
   body : regt list ;
 }
 ;;
 
-let asml = [(Main (LET ("x", VAL (Const 1), (LET ("y", VAL (Const 2), (LET ("a", (VAL (Const 8)),
-                                                                            (LET ("b", VAL (Const 14), (LET ("i", VAL (Const 14),
-                                                                                                             EXP (CALL ("bonjour",["a";"z";"x";"b";"i"])))))))))))))];;
+
  
 let print_hashtable my_hashtable =
   Hashtbl.iter (fun key value ->
@@ -74,7 +78,7 @@ let print_intervals intervals =
       Printf.printf "(%s,(%s))\n" key start
     ) intervals;; 
 
-let num_registers = 3;;
+let num_registers = 9;;
  (* hashmap de toutes les variables sur la pile avec leurs adresses
 exemple : "x" "FP - 4" : *)
 let var_in_stack = Hashtbl.create 0;;
@@ -83,6 +87,8 @@ hashtable binding variable to register,
 a : r1 -> variable `a` is in register `r1` 
 *)
 let var_to_register = Hashtbl.create num_registers;;
+
+ (* Retourne pour chaque ligne i les prochaines variables qui vont etre utilisées *)
 
 let get_intervals_i asml = 
   let list = ref [] in
@@ -121,6 +127,11 @@ let get_intervals_i asml =
         i_intervals_expr (CALL (s,tl))
     | CALL (_, []) -> ()
     | _ when (List.length !list) = num_registers -> () 
+    | IFEQ ((s,i_o_s) , asmt1, asmt2) | IFLE ((s,i_o_s) , asmt1, asmt2) | IFGE ((s,i_o_s) , asmt1, asmt2) -> 
+        i_intervals_string s;
+        i_intervals_asmt asmt1;
+        i_intervals_asmt asmt2;
+        
     | _ -> ()
              (* and i_intervals asml =
                  match asml with
@@ -135,16 +146,7 @@ let get_intervals_i asml =
   let l = list in l
 ;;
 
-             (* and i_intervals asml =
-                 match asml with
-                 | _ when (List.length !list) = num_registers -> () 
-                 | (Main hd) :: tail -> 
-                     i_intervals_asmt hd;
-                     i_intervals tail
-                 | LetFloat _ :: tl -> () (* A definir *)
-                 | LetLabel (_,_,_) :: tl -> () (* A definir *) *)
 
-;;
 (* on va renvoyer asml avce le nom de la fonction quand on appelle i_get_interval *)
 
  (* retourne une list de var qui doivent etre store car presente dans la hashmap mais pas dans la liste active *) 
@@ -187,7 +189,7 @@ let store_load intervals body =
              let adr = Hashtbl.find var_in_stack v in
              body := !body @ [Store ((Reg r), adr)];
            with Not_found ->
-             let adr = "fp - " ^ string_of_int (((Hashtbl.length var_in_stack) + 1) * 4) in
+             let adr = "[fp, #-" ^ string_of_int (((Hashtbl.length var_in_stack) + 1) * 4) ^ "]" in
              Hashtbl.add var_in_stack v adr;
              body := !body @ [Store ((Reg r), adr)]);
           (try
@@ -208,61 +210,30 @@ let store_load intervals body =
     ()
 ;; 
 
-let store_to_regs_params lst bd =
-  (*let params = Hashtbl.create 4 in*)
-  let rec store lst count = 
-    match lst with 
-    | hd :: tl -> 
-        (try
-           let r = Hashtbl.find var_to_register hd in 
-           let new_r = "r" ^ string_of_int count in
-           bd := !bd @ [Let (new_r, Reg r)];
-           store tl (count + 1)
-         with Not_found -> 
-           let adr = Hashtbl.find var_in_stack hd in
-           let new_r = "r" ^ string_of_int count in
-           bd := !bd @ [Load (adr, Reg new_r)];
-           store tl (count + 1)
-        ); 
-    | [] -> ()
-  in store lst 0
-;; 
-
-
-let premiers_elements l =
-  let final = ref [] in
-  let rec npe l count = 
-    if count == num_registers 
-    then ()
-    else 
-      match l with 
-      | [] -> ()
-      | e :: ll -> final := !final @ [e];
-          (npe ll (count + 1))
-  in npe l 0; final
-;;
 
 
 let parcours asml =
   let new_body = ref [] in 
+
   let rec parcours_asmt asmt bd =
     match asmt with
-    | LET (var1, var2, exp) -> 
+    | LET (var1, var2, exp) ->
+        Printf.printf "%s \n" var1;
         let active = get_intervals_i asmt in
         store_load active bd;
-        bd := !bd @ [Let ((Hashtbl.find var_to_register var1), (parcours_expr var2 bd))];
+        bd := !bd @ [Let ((Hashtbl.find var_to_register var1), (parcours_expr var2))];
         parcours_asmt exp bd; 
     | EXP expr -> 
         let active = get_intervals_i asmt in
         store_load active bd;
-        bd := !bd @ [Exp (parcours_expr expr bd)];
+        bd := !bd @ [Exp (parcours_expr expr)];
         bd
   and parcours_id_or_im id_or_im =
     match id_or_im with
     | Const n -> Int n
     | Var r ->  Reg (Hashtbl.find var_to_register r)
                   
-  and parcours_expr expr bd =
+  and parcours_expr expr =
     match expr with
     | VAL v -> 
         parcours_id_or_im v
@@ -273,27 +244,32 @@ let parcours asml =
     | SUB (s, id_or_im) -> 
         Sub (Hashtbl.find var_to_register s, parcours_id_or_im id_or_im)
     | NOP -> Unit
-    | CALL (s, ls) ->
-        let active = premiers_elements ls in
-        store_load active bd; 
-        store_to_regs_params ls bd;
-        Call (s) 
+    | IFEQ ((s,i_o_s) , asmt1, asmt2) -> 
+        If ("eq",(s, parcours_id_or_im i_o_s), !(parcours_asmt asmt1 (ref [])), !(parcours_asmt asmt2 (ref [])))
+    | IFLE ((s,i_o_s) , asmt1, asmt2) -> 
+        If ("le",(s, parcours_id_or_im i_o_s), !(parcours_asmt asmt1 (ref [])), !(parcours_asmt asmt2 (ref [])))
+    | IFGE ((s,i_o_s) , asmt1, asmt2) -> 
+        If ("ge",(s, parcours_id_or_im i_o_s), !(parcours_asmt asmt1 (ref [])), !(parcours_asmt asmt2 (ref [])))
+      
     | _ -> Unit
 
-  and parcours_asml_list asml_list =
+  and parcours_asml_list asml_list =[fp, #-4]
     match asml_list with
     | Main hd :: tl -> 
         let new_func : reg_function = {
-          name = "Main"; 
+          name = "Main";
+          params = [];
           body = !(parcours_asmt hd (ref []));
         } in 
         new_body:= !new_body @ [Fun new_func];
         parcours_asml_list tl 
-    | LetFloat _ :: tl -> !new_body (* À définir *)
-    | LetLabel (_,_,_) :: tl-> !new_body (* À définir *) 
-    | [] -> !new_body
+    | LetFloat _ :: tl -> () (* À définir *)
+    | LetLabel (_,_,_) :: tl-> () (* À définir *) 
+    | [] -> ()
   in 
+
   parcours_asml_list asml;
+  !new_body
 ;;
 
 let rec print_reg_expr reg_expr =
@@ -306,13 +282,11 @@ let rec print_reg_expr reg_expr =
   | Sub (s, expr) -> Printf.printf "(Sub (%s," s ;
       print_reg_expr expr;
       Printf.printf "))";
-  | Assign (s, expr) -> Printf.printf "(Assign (%s," s ;
-      print_reg_expr expr;
-      Printf.printf "))";
   | Call (name) ->
       Printf.printf "Call(%s)" name 
   | Reg s -> Printf.printf  "Reg %s" s
   | Unit -> Printf.printf  "Unit"
+  | If (_,_,_,_) -> Printf.printf  "if()"
 
 and print_regt  regt =
   match regt with
@@ -341,5 +315,10 @@ let rec print_reg_function reg_function =
   | [] -> ()
 ;;
 
-let () =
-print_reg_function (parcours asml)
+
+let asml = [(Main (LET ("x", VAL (Const 1), (LET ("y", VAL (Const 2), (LET ("a", (VAL (Const 8)),
+                                                                            (LET ("b", VAL (Const 14), (LET ("i", VAL (Const 14),
+                                                                                                             EXP (CALL ("bonjour",["a";"z";"x";"b";"i"])))))))))))))];;
+
+let () = 
+print_reg_function(parcours asml)
