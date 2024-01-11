@@ -88,6 +88,23 @@ if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
         failed=$((failed+1))
 fi
 
+test_case=tests/gen-code/higher_order_function.ml
+asml_generated=tests/gen-code/higher_order_function.asml
+result=tests/gen-code/higher_order_function_asml.actual
+expected=tests/gen-code/higher_order_function_asml.expected
+echo "testing compiler on: $test_case"
+echo $($MINCAMLC $OPTION "$test_case") 2> $asml_generated 1> $asml_generated
+echo $($ASML "$asml_generated") 2> $result 1> $result
+echo $(diff -s "$result" "$expected")
+if diff -s "$result" "$expected" 2> /dev/null 1> /dev/null
+    then 
+        echo "OK"
+        passed=$((passed+1))
+    else
+        echo "KO"
+        failed=$((failed+1))
+fi
+
 echo "\nfor Iteration 5 : arrays and tuples"
 test_case=tests/gen-code/manipulate_tuple.ml
 asml_generated=tests/gen-code/manipulate_tuple.asml
