@@ -1,37 +1,5 @@
 open Asml;;
 
-(* type id_or_imm = Var of Id.t | Const of int
-
-type expr =
-| NOP
-| VAL of id_or_imm
-| LABEL of Id.l
-| NEG of Id.t
-| ADD of Id.t * id_or_imm
-| SUB of Id.t * id_or_imm
-| FNEG of Id.t
-| FADD of Id.t * Id.t
-| FSUB of Id.t * Id.t
-| FMUL of Id.t * Id.t
-| FDIV of Id.t * Id.t
-| NEW of id_or_imm
-| MEMGET of Id.t * id_or_imm
-| MEMASSIGN of Id.t * id_or_imm * Id.t
-| IFEQ of (Id.t*id_or_imm) * asmt * asmt
-| IFLE of (Id.t*id_or_imm) * asmt * asmt
-| IFFEQUAL of (Id.t*Id.t) * asmt * asmt
-| IFFLE of (Id.t*Id.t) * asmt * asmt
-| CALL of Id.l * Id.t list
-| CALLCLO of Id.t * Id.t list
-and asmt =
-| LET of Id.t * expr * asmt (* let t = exp in asmt *)
-| EXP of expr
-and letdef =
-| Main of asmt
-| LetFloat of float
-| LetLabel of Id.l * Id.t list * asmt
-and asml = letdef list *)
-
 (* type pour la partie back-end *)
 type reg_expr =
   | Int of int 
@@ -62,28 +30,26 @@ let asml = [(Main (LET ("x", VAL (Const 1), (LET ("y", VAL (Const 2), (LET ("a",
                                                                             (LET ("b", VAL (Const 14), (LET ("i", VAL (Const 14),
                                                                                                              EXP (CALL ("bonjour",["a";"z";"x";"b";"i"])))))))))))))];;
  
+
+(* Fonctions pour print une hashtables composée de string string, une liste de string *)
 let print_hashtable my_hashtable =
   Hashtbl.iter (fun key value ->
-      Printf.printf "%s -> %s\n" key value  (* Remplacez 'string_of_int' par une conversion appropriée pour votre type 'a' *)
+      Printf.printf "%s -> %s\n" key value  
     ) my_hashtable;;
 let print_free my_list =
   List.iter (fun elem ->
-      Printf.printf "%s\n" elem  (* Remplacez '%s' par le format approprié pour le type réel de vos éléments *)
+      Printf.printf "%s\n" elem  
     ) my_list;;
-let print_intervals intervals =
-  List.iter (fun (key,start) ->
-      Printf.printf "(%s,(%s))\n" key start
-    ) intervals;; 
 
+(* Nombres de registres pour les variables locales *)
 let num_registers = 9;;
- (* hashmap de toutes les variables sur la pile avec leurs adresses
-exemple : "x" "FP - 4" : *)
+ 
+(* Hashmap des variables sur la pile avec leurs adresses, exemple : "x" -> "[fp, #4]" *)
 let var_in_stack = Hashtbl.create 0;;
-     (* parcours_asmt
-hashtable binding variable to register,
-a : r1 -> variable `a` is in register `r1` 
-*)
+
+(* Hashmap des variables avec leurs registres associés, exemple : "x" -> "r4" *)
 let var_to_register = Hashtbl.create num_registers;;
+
 
 let get_intervals_i asml = 
   let list = ref [] in
@@ -285,20 +251,23 @@ let parcours asml =
         store_to_regs_params ls bd;
         Call (s) 
     | IFEQ ((s,i_o_s) , asmt1, asmt2) -> 
+        let s1 = Hashtbl.find var_to_register s in
         let i = parcours_id_or_im i_o_s in
         let a1 = !(parcours_asmt asmt1 (ref [])) in
         let a2 = !(parcours_asmt asmt2 (ref [])) in
-        If ("eq",(s, i), a1, a2)
+        If ("eq",(s1, i), a1, a2)
     | IFLE ((s,i_o_s) , asmt1, asmt2) -> 
+        let s1 = Hashtbl.find var_to_register s in
         let i = parcours_id_or_im i_o_s in
         let a1 = !(parcours_asmt asmt1 (ref [])) in
         let a2 = !(parcours_asmt asmt2 (ref [])) in
-        If ("le",(s, i), a1, a2)
+        If ("le",(s1, i), a1, a2)
     | IFGE ((s,i_o_s) , asmt1, asmt2) -> 
+        let s1 = Hashtbl.find var_to_register s in
         let i = parcours_id_or_im i_o_s in
         let a1 = !(parcours_asmt asmt1 (ref [])) in
         let a2 = !(parcours_asmt asmt2 (ref [])) in
-        If ("ge",(s, i), a1, a2)
+        If ("ge",(s1, i), a1, a)
     | _ -> Unit
 
   and parcours_asml_list asml_list =
