@@ -2,7 +2,7 @@
 
 (* version *)
 let show_version () =
-  print_endline "MinCamlCompiler v0.1 - 21-12-2023";
+  print_endline "MinCamlCompiler v0.1.11 - 11-01-2023";
   exit 0
 
 (* Global variables for Arg's parser *)
