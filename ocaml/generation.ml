@@ -98,7 +98,7 @@ and generate_prologue size =
   ["push {fp, lr}"; "add fp, sp, #0"; "add sp, sp, #-" ^ string_of_int (size * 4)]
 
 and generate_epilogue =
-  ["add sp, fp, #0"; "pop {fp, lr}"; "bx lr"]
+  ["add sp, fp, #0"; "pop {fp, lr}"; "bx lr\n"]
 
 let generate_asm_reg (defs: letregdef list) : string list =
   match defs with

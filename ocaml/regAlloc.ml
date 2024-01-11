@@ -42,7 +42,7 @@ let print_free my_list =
     ) my_list;;
 
 (* Nombres de registres pour les variables locales *)
-let num_registers = 9;;
+let num_registers = 7;;
  
 (* Hashmap des variables sur la pile avec leurs adresses, exemple : "x" -> "[fp, #4]" *)
 let var_in_stack = Hashtbl.create 0;;
