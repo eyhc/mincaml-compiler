@@ -38,10 +38,10 @@ let print_intervals intervals =
       Printf.printf "(%s,(%s))\n" key start
     ) intervals;; 
 
-(* nombres de registres pour les variables locales *)
+(* Nombres de registres pour les variables locales *)
 let num_registers = 7;;
-
-(* hashmap des variables sur la pile avec leurs adresses exemple : "x" "FP - 4"  *)
+ 
+(* Hashmap des variables sur la pile avec leurs adresses, exemple : "x" -> "[fp, #4]" *)
 let var_in_stack = Hashtbl.create 0;;
      (* parcours_asmt
 hashtable binding variable to register,
