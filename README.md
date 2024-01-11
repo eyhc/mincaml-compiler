@@ -1,5 +1,10 @@
 # Projet M1 INFO - Compilateur Ocaml
 
+## Groupe : LesPerdus
+
+LES NOMS ???:
+
+
 ## Compilation
 
 Utiliser simplement `make` dans le dossier `ocaml/`.
