@@ -135,6 +135,7 @@ let find_free_vars (code: Knorm.knorm_t) (args: Id.t list) (locals: Id.t list) (
     match e with
     | Var id -> if is_free id then [id] else []
     | Add(a, b) | Sub(a, b) -> (if is_free a then [a] else []) @ (if is_free b then [b] else [])
+    | Neg a -> (if is_free a then [a] else [])
     | IfEq((a, b), t, els) | IfLE((a, b), t, els) -> (if is_free a then [a] else []) @ (if is_free b then [b] else []) @
                                                       worker t @ worker els
     | Let((id, t), value, next) -> worker value @ worker next
@@ -224,6 +225,7 @@ let convert_func_body (header: funheader) (code: Knorm.knorm_t) (funcs: funheade
                   Var(id)
     | Add(a, b) -> Add(rename a to_rename, rename b to_rename)
     | Sub(a, b) -> Sub(rename a to_rename, rename b to_rename)
+    | Neg a -> Neg (rename a to_rename)
     | IfEq((a, b), t, els) -> IfEq((rename a to_rename, rename b to_rename), worker t, worker els)
     | IfLE((a, b), t, els) -> IfLE((rename a to_rename, rename b to_rename), worker t, worker els)
     | Let((id, t), App(name, a), next) -> 
@@ -267,6 +269,7 @@ let convert_main (code: Knorm.knorm_t) (funcs: funheader list): t =
     | Var id -> Var(id)
     | Add(a, b) -> Add(a, b)
     | Sub(a, b) -> Sub(a, b)
+    | Neg a -> Neg a
     | IfEq((a, b), t, els) -> IfEq((a, b), worker t, worker els)
     | IfLE((a, b), t, els) -> IfLE((a, b), worker t, worker els)
     | Let((id, t), App(name, args), next) -> 

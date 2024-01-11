@@ -69,7 +69,7 @@ let call_predef (f:Id.l) (vars:Id.t list) : expr =
   match f with
   | "print_int" -> CALL ("_min_caml_print_int", vars)
   | "print_float" -> CALL ("_min_caml_print_float", vars)
-  | "print_newline" -> CALL ("_min_caml_print_float", vars)
+  | "print_newline" -> CALL ("_min_caml_newline", vars)
   | "sin" -> CALL ("_min_caml_sin", vars)
   | "cos" -> CALL ("_min_caml_cos", vars)
   | "sqrt" -> CALL ("_min_caml_sqrt", vars)

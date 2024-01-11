@@ -37,3 +37,9 @@ setup.log
 */*.mml
 *.s
 */*.s
+
+*.out
+*/*.out
+
+*.run
+*/*.run

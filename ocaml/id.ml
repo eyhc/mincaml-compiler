@@ -9,4 +9,4 @@ let make_unique =
     incr counter;
     Printf.sprintf "%s%d" name !counter
 
-let genid () = make_unique "temp"
+let genid () = make_unique "t"
