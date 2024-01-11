@@ -123,6 +123,7 @@ let get_intervals_i asml =
     | CALL (_, []) -> ()
     | IFEQ ((s,i_o_s) , asmt1, asmt2) | IFLE ((s,i_o_s) , asmt1, asmt2) | IFGE ((s,i_o_s) , asmt1, asmt2) -> 
       i_intervals_string s;
+      i_intervals_id_or_imm i_o_s;
       i_intervals_asmt asmt1;
       i_intervals_asmt asmt2;
     | _ when (List.length !list) = num_registers -> () 
@@ -284,11 +285,20 @@ let parcours asml =
         store_to_regs_params ls bd;
         Call (s) 
     | IFEQ ((s,i_o_s) , asmt1, asmt2) -> 
-        If ("eq",(s, parcours_id_or_im i_o_s), !(parcours_asmt asmt1 (ref [])), !(parcours_asmt asmt2 (ref [])))
+        let i = parcours_id_or_im i_o_s in
+        let a1 = !(parcours_asmt asmt1 (ref [])) in
+        let a2 = !(parcours_asmt asmt2 (ref [])) in
+        If ("eq",(s, i), a1, a2)
     | IFLE ((s,i_o_s) , asmt1, asmt2) -> 
-        If ("le",(s, parcours_id_or_im i_o_s), !(parcours_asmt asmt1 (ref [])), !(parcours_asmt asmt2 (ref [])))
+        let i = parcours_id_or_im i_o_s in
+        let a1 = !(parcours_asmt asmt1 (ref [])) in
+        let a2 = !(parcours_asmt asmt2 (ref [])) in
+        If ("le",(s, i), a1, a2)
     | IFGE ((s,i_o_s) , asmt1, asmt2) -> 
-        If ("ge",(s, parcours_id_or_im i_o_s), !(parcours_asmt asmt1 (ref [])), !(parcours_asmt asmt2 (ref [])))  
+        let i = parcours_id_or_im i_o_s in
+        let a1 = !(parcours_asmt asmt1 (ref [])) in
+        let a2 = !(parcours_asmt asmt2 (ref [])) in
+        If ("ge",(s, i), a1, a2)
     | _ -> Unit
 
   and parcours_asml_list asml_list =
