@@ -164,37 +164,43 @@ let normalize (exp:Syntax.t) : knorm_t =
 
 (*********************************************************)
 (* fonctions to_string : dans l'idée de Syntax.to_string *)
-let rec to_string_rec (with_type:bool) (k:knorm_t) : string =
+let rec to_string_rec (with_type:bool) ?(p: string="") (k:knorm_t) : string =
   let to_string_rec = to_string_rec with_type in
+  let tab = "  " in
+  let arithemic_op_to_string (p: string) (a: Id.t) (b: Id.t) (op: string): string =
+    sprintf "%s%s %s %s" p (Id.to_string a) op (Id.to_string b)
+  in
+  let if_to_string (p: string) (a: Id.t) (b: Id.t) (op: string) (th: knorm_t) (els: knorm_t): string =
+    sprintf "%sif %s %s %s then\n%s\n%selse\n%s" p a op b (to_string_rec ~p:(p^tab) th) p (to_string_rec ~p:(p^tab) els)
+  in
   match k with
   | Var b -> Id.to_string b
   | Unit -> "()"
   | Int i -> string_of_int i
   | Float f -> sprintf "%.2f" f
   | Neg b -> sprintf "(- %s)" (Id.to_string b)
-  | Add (b1, b2) -> sprintf "(%s + %s)" (Id.to_string b1) (Id.to_string b2)
-  | Sub (b1, b2) -> sprintf "(%s - %s)" (Id.to_string b1) (Id.to_string b2)
+  | Add (b1, b2) -> arithemic_op_to_string p b1 b2 "+"
+  | Sub (b1, b2) -> arithemic_op_to_string p b1 b2 "-"
   | FNeg b -> sprintf "(-. %s)" (Id.to_string b)
-  | FAdd (b1, b2) -> sprintf "(%s +. %s)" (Id.to_string b1) (Id.to_string b2)
-  | FSub (b1, b2) -> sprintf "(%s -. %s)" (Id.to_string b1) (Id.to_string b2)
-  | FMul (b1, b2) -> sprintf "(%s *. %s)" (Id.to_string b1) (Id.to_string b2)
-  | FDiv (b1, b2) -> sprintf "(%s /. %s)" (Id.to_string b1) (Id.to_string b2)
-  | IfEq ((x, y), k1, k2) -> sprintf "(if %s = %s then %s \nelse %s)" 
-    (Id.to_string x) (Id.to_string y) (to_string_rec k1) (to_string_rec k2)
-  | IfLE ((x, y), k1, k2) -> sprintf "(if %s <= %s then %s \nelse %s)" 
-    (Id.to_string x) (Id.to_string y) (to_string_rec k1) (to_string_rec k2)
-  | Let ((id,t), k1, k2) -> sprintf "(let %s%s = %s in \n%s)"
-    (Id.to_string id) (if with_type then ":"^Type.to_string2 t else "")
-    (to_string_rec k1) (to_string_rec k2)
-  | LetRec (fd, e) -> sprintf "(let rec %s%s %s = %s in \n%s)"
+  | FAdd (b1, b2) -> arithemic_op_to_string p b1 b2 "+."
+  | FSub (b1, b2) -> arithemic_op_to_string p b1 b2 "-."
+  | FMul (b1, b2) -> arithemic_op_to_string p b1 b2 "*."
+  | FDiv (b1, b2) -> arithemic_op_to_string p b1 b2 "/."
+  | IfEq ((x, y), k1, k2) -> if_to_string p x y "=" k1 k2
+  | IfLE ((x, y), k1, k2) -> if_to_string p x y "<=" k1 k2
+  | Let ((id,t), k1, k2) -> sprintf "%slet %s%s = %s in\n%s"
+    p (Id.to_string id) (if with_type then ":"^Type.to_string2 t else "")
+    (to_string_rec k1) (to_string_rec ~p:p k2)
+  | LetRec (fd, e) -> sprintf "let rec %s%s %s =\n%s\nin\n%s"
     (Id.to_string (fst fd.name))
     (if with_type then ":" ^ (Type.to_string2 (snd fd.name)) else "")
     (Syntax.infix_to_string (fun x -> Id.to_string (fst x)) fd.args " ")
-    (to_string_rec fd.body)
+    (to_string_rec ~p:(p^tab) fd.body)
     (to_string_rec e)
-  | App (id, l) -> sprintf "(%s %s)" 
-    (Id.to_string id) (Syntax.infix_to_string Id.to_string l " ")
-  | LetTuple (args, var, e) -> sprintf "let (%s)%s = %s in \n%s"
+  | App (id, l) -> sprintf "%s%s %s" 
+    p (Id.to_string id) (Syntax.infix_to_string Id.to_string l " ")
+  | LetTuple (args, var, e) -> sprintf "%slet (%s)%s = %s in \n%s"
+    p
     (Syntax.infix_to_string (fun x -> Id.to_string (fst x)) args ",")
     (if with_type then ":tuple(" ^ (Syntax.infix_to_string (fun (_, y) -> Type.to_string2 y) args " ") ^ ")" else "")
     (Id.to_string var)
