@@ -75,26 +75,23 @@ let rec generation_expr (a:Closure.t) : expr =
   | Add (x, y) -> ADD (x, Var y)
   | Sub (x, y) -> SUB (x, Var y)
 
-  | IfEq ((x,y), at1, at2) -> 
+  | IfEq (x, y, at1, at2) -> 
     IFEQ((x, Var y), generation_asmt at1, generation_asmt at2)
-  | IfLE ((x,y), at1, at2) ->
+  | IfLE (x, y, at1, at2) ->
     IFLE((x, Var y), generation_asmt at1, generation_asmt at2)
-  | ApplyPredef (f, vars) -> call_predef f vars
+  | ApplyDir(f, vars) -> if Typechecker.is_prefef_fun f then call_predef f vars else failwith "todo"
 
-  | MakeClosure (f, ys) -> failwith "todo"
-  | ApplyDirect (l, args) -> failwith "todo"
+  (* | MakeClosure (f, ys) -> failwith "todo" *)
   | _ -> assert false
 
 
 and generation_asmt (a:Closure.t) : asmt = 
  match a with
- | Let (x, e1, e2) -> LET(x, generation_expr e1, generation_asmt e2)
+ | Let ((x, t), e1, e2) -> LET(x, generation_expr e1, generation_asmt e2)
  | _ -> EXP (generation_expr a)
 
-let rec generation_letdef (a:Closure.t) : letdef =
- match a with
- | LetRec (fh, body) -> LetLabel (fh.label, fh.args, generation_asmt body)
- | _ -> failwith "todo letdef"
+let rec generation_letdef (a:Closure.fundef) : letdef =
+  LetLabel (fst a.label, List.map fst a.args, generation_asmt a.code)
 
 let rec generation (ast:Closure.t) : asml = 
  match ast with
