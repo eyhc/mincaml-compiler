@@ -1,38 +1,8 @@
 open RegAlloc
 
 let header : string =
-".data
-f_float:   .asciz \"%f\"
-f_int:     .asciz \"%d\"
-f_newline: .asciz \"\\n\"
-
-.text
+".text
 .global main
-
-@relai
-R_fint: .word f_int
-R_newl: .word f_newline
-
-_min_caml_print_int:
-push {lr}
-mov r1, r0
-ldr r0, R_fint
-bl printf
-pop {lr}
-bx lr
-
-_min_caml_print_newline:
-push {lr}
-ldr r0, R_newl
-bl printf
-pop {lr}
-bx lr
-
-_min_caml_abs:
-push {lr}
-bl abs
-pop {lr}
-bx lr
 
 "
 
