@@ -273,6 +273,9 @@ let convert_main (code: Knorm.knorm_t) (funcs: funheader list): t =
     | IfEq((a, b), t, els) -> IfEq((a, b), worker t, worker els)
     | IfLE((a, b), t, els) -> IfLE((a, b), worker t, worker els)
     | Let((id, t), App(name, args), next) -> 
+      if Typechecker.is_prefef_fun name then
+        Let(id, ApplyPredef(name, args), worker next)
+      else
       if is_func_name name then
         let h = find_header name in
         if List.length h.frees = 0 then
