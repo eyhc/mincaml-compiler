@@ -296,7 +296,7 @@ let parcours asml =
         let var_to_register = Hashtbl.create 0 in
         let new_func : reg_function = {
           name = "main"; 
-          body = !(parcours_asmt hd (ref []) var_to_register);
+          body = !(parcours_asmt hd (ref []) var_to_register) @ [Let ("r0", Int 0)];
         } in 
         new_body:= !new_body @ [Fun new_func];
         parcours_asml_list tl 
