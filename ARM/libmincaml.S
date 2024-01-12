@@ -139,3 +139,12 @@ _min_caml_print_int:
 	ldmfd	sp!, {lr}
         bx	lr
         .size _min_caml_print_int, .-_min_caml_print_int
+
+_min_caml_abs:
+    stmfd sp!, {lr}
+    cmp r0, #0
+    bge is_pos
+    neg r0, r0
+is_pos:
+    ldmfd sp!, {lr}
+    bx lr

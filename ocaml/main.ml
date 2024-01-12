@@ -161,7 +161,7 @@ let print_asml f =
     let ast = Closure.closure ast in         (* Closure conversion *)
     let asml = Asml.generation ast in        (* ASML generation *)
                                              (* Immediate optimisation *)
-    print_endline (Asml.string_struct asml)      (* Displaying *)
+    print_endline (Asml.to_string asml)      (* Displaying *)
 
 
 (* Compile code file f to arm (32?) *)
