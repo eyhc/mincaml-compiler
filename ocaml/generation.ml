@@ -44,6 +44,7 @@ let generate_if_label () =
   label
 
 let rec count_lets_in_regt : regt -> int = function
+  | Let (s, _) when List.mem s ["r0"; "r1"; "r2"; "r3"] -> 0
   | Let (_, _) -> 1
   | Exp _ | Store (_, _) | Load (_, _) -> 0
 
