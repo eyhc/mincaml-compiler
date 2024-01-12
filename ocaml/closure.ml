@@ -1,308 +1,192 @@
 open Printf
-
-(* Remove duplicates values in list *)
-let rec remove_dups list =
-  match list with
-  | [] -> []
-  | [x] -> [x]
-  | x :: tail -> if List.exists (fun y -> x = y) tail then remove_dups tail else x :: remove_dups tail
-
+open Utils
 
 type t =
   | Unit
-  | Int of int
   | Var of Id.t
   (* Pour les entiers *)
+  | Int of int
   | Neg of Id.t
   | Add of Id.t * Id.t
   | Sub of Id.t * Id.t
-  (* If égal: (opérande gauche * opérande droite) * then * else  *)
-  | IfEq of (Id.t * Id.t) * t * t
-  (* If inférieur ou égal: (opérande gauche * opérande droite) * then * else  *)
-  | IfLE of (Id.t * Id.t) * t * t
-  (* Déclaration d'une variable: nom * valeur * in *)
-  | Let of Id.t * t * t
-  (* Une fonction: en-tête * code *)
-  | LetRec of funheader * t
-  (* Création d'une closure: label de la fonction * variables libres *)
-  | MakeClosure of Id.t * Id.t list
+  (* If égal: opérande gauche * opérande droite * then * else  *)
+  | IfEq of Id.t * Id.t * t * t
+  (* If inférieur ou égal: opérande gauche * opérande droite * then * else  *)
+  | IfLE of Id.t * Id.t * t * t
+  (* Déclaration d'une variable: (id, type) * valeur * in *)
+  | Let of (Id.t * Type.t) * t * t
+  (* Création d'une closure: (id * type)  * label de la fonction * variables libres * next (équivalent à un let) *)
+  | MakeCls of (Id.t * Type.t) * Id.t * Id.t list * t
   (* Appel à une fonction via apply_direct: label de la fonction * arguments *)
-  | ApplyDirect of Id.t * Id.t list
+  | ApplyDir of Id.t * Id.t list
   (* Appel à une closure via apply_closure: nom variable contenant la closure * arguments *)
-  | ApplyClosure of Id.t * Id.t list
-  (* Appel à une fonction prédéfinie: nom de la fonction * arguments *)
-  | ApplyPredef of Id.t * Id.t list
+  | ApplyCls of Id.t * Id.t list
   (* Programme: fonctions du programme * code principal *)
-  | Prog of t list * t
-(* En-tête d'une fonction: label * arguments * variables libres * variables locales * fonction parente (peut être None) *)
-and funheader = {label: Id.t; args: Id.t list; frees: Id.t list; locals: Id.t list; parent: funheader ref option;}
+  | Prog of fundef list * t
+(* Définition d'une fonction: label * arguments * variables libres * code *)
+and fundef = {label: (Id.t * Type.t); args: (Id.t * Type.t) list; frees: (Id.t * Type.t) list; code: t}
 
 (************************
    To string functions
 ************************)
 
-let rec infix_to_string (to_s : 'a -> string) (l : 'a list) (op : string) : string = 
-  match l with 
-  | [] -> ""
-  | [x] -> to_s x
-  | hd :: tl -> (to_s hd) ^ op ^ (infix_to_string to_s tl op)
-
-let rec to_string ?(p: string = "") (exp: t): string =
+let rec to_string ?(p: string = "") exp: string =
   let tab = "  " in
-  let arithemic_op_to_string (p: string) (a: Id.t) (b: Id.t) (op: string): string =
-    sprintf "%s%s %s %s" p (Id.to_string a) op (Id.to_string b)
-  in
-  let if_to_string (p: string) (a: Id.t) (b: Id.t) (op: string) (th: t) (els: t): string =
-    sprintf "%sif %s %s %s then\n%s\n%selse\n%s\n" p a op b (to_string ~p:(p^tab) th) p (to_string ~p:(p^tab) els)
+  let fundef_to_string (fd: fundef): string =
+    sprintf("label: %s\nparameters: %s\nfrees variables: %s\ncode:\n%s\n") 
+    (fst fd.label) (if List.length fd.args = 0 then "None" else Syntax.infix_to_string (fun (x, y) -> Id.to_string x) fd.args " ")
+    (if List.length fd.frees = 0 then "None" else Syntax.infix_to_string (fun (x, y) -> Id.to_string x) fd.frees " ") 
+    (to_string ~p:(p^tab) fd.code)
   in
   match exp with
-  | Int i -> p ^ string_of_int i
-  | Var id -> p ^ Id.to_string id
-  | Neg a -> sprintf "-%s" (Id.to_string a)
-  | Add(a, b) -> arithemic_op_to_string p a b "+"
-  | Sub(a, b) -> arithemic_op_to_string p a b "-"
-  | IfEq((a, b), t, e) -> if_to_string p a b "=" t e
-  | IfLE((a, b), t, e) -> if_to_string p a b "<=" t e
-  | Let(id, value, next) -> sprintf "%slet %s = %s in\n%s" p (Id.to_string id) (to_string value) (to_string ~p:p next)
-  | LetRec(fd, body) -> sprintf("label: %s\nfree variables: %s\nparameters: %s\ncode:\n%s\n") fd.label 
-                          (if (List.length fd.frees) = 0 then "None" else infix_to_string Id.to_string fd.frees " ")
-                          (if (List.length fd.args) = 0 then "None" else infix_to_string Id.to_string fd.args " ")
-                          (to_string ~p:tab body)
-  | MakeClosure(label, free_vars) -> sprintf "%smake_closure(%s)" p (infix_to_string Id.to_string (label :: free_vars) ", ")
-  | ApplyDirect(label, args) -> sprintf "%sapply_direct(%s)" p (infix_to_string Id.to_string (label :: args) ", ")
-  | ApplyClosure(name, args) -> sprintf "%sapply_closure(%s)" p (infix_to_string Id.to_string (name :: args) ", ")
-  | ApplyPredef(name, args) -> sprintf "%s%s %s" p name (infix_to_string Id.to_string args " ")
-  | Prog(funs, main) -> sprintf "%s\nMain:\n%s" (infix_to_string to_string funs "\n") (to_string main)
-  | _ -> ""
+  | Unit -> "()"
+  | Var id -> sprintf("%s%s") p (Id.to_string id)
+  | Int i -> string_of_int i
+  | Neg x -> Id.to_string x
+  | Add(a, b) -> sprintf("%s%s + %s") p a b
+  | Sub(a, b) -> sprintf("%s%s - %s") p a b
+  | IfEq(a, b, th, els) -> sprintf("%sif %s = %s then\n%s\n%selse\n%s") p a b (to_string ~p:(p^tab) th) p (to_string ~p:(p^tab) els)
+  | IfLE(a, b, th, els) -> sprintf("%sif %s <= %s then\n%s\n%selse\n%s") p a b (to_string ~p:(p^tab) th) p (to_string ~p:(p^tab) els)
+  | Let((id, t), value, next) -> sprintf("%slet %s = %s in\n%s") p id (to_string value) (to_string ~p:p next)
+  | MakeCls((id, t), label, args, next) -> sprintf("%slet %s = make_closure(%s) in\n%s") p 
+  id (Syntax.infix_to_string Id.to_string (label :: args) ", ") (to_string ~p:p next)
+  | ApplyDir(label, args) -> sprintf("%sapply_direct(%s)") p (Syntax.infix_to_string Id.to_string (label :: args) ", ")
+  | ApplyCls(name, args) -> sprintf("%sapply_closure(%s)") p (Syntax.infix_to_string Id.to_string (name :: args) ", ")
+  | Prog(funs, main) -> sprintf("%s\nMAIN:\n%s") (Syntax.infix_to_string fundef_to_string funs "\n") (to_string main)
 
 (************************
    Closure conversion functions
 ************************)
 
-let insert_let e k =
-  let name = Id.genid () in
-  let e' = k (Var(name)) in
-  Let(name, e, e')
-
 (* 
   Génère un label pour une fonction
   Paramètres:
-  - x -> le nom de la fonction
+  - var -> le nom de la fonction
   Retourne: un label
 *)
-let gen_label (x: Id.t): Id.t = "fun_"^x
+let genlabel (var: Id.t): Id.t = "fun_"^var
 
 (* 
-  Extrait la liste des noms des fonctions du programme
+  Cherche la liste des variables dans une expression
   Paramètres:
-  - ast -> l'ast du programme
-  Retourne: une liste de Id.t   
+  - env -> l'environnement de l'expression
+  - parent -> la fonction dans laquelle se trouve cette expression
+  - exp -> une expression de type knorm_t
+  Retourne: une liste de variables
 *)
-let rec find_funcs_names (ast: Knorm.knorm_t): Id.t list =
-  match ast with
-  | Let((id, t), value, next) -> find_funcs_names next
-  | LetRec(fd, next) -> (fst fd.name) :: (find_funcs_names fd.body @ find_funcs_names next)
-  | _ -> []
-
-(* 
-  Extrait la liste des variables locales d'une fonction
-  Paramètres:
-  - e -> le code de la fonction
-  Retourne: une liste de Id.t   
-*)
-let rec find_locals_vars (e: Knorm.knorm_t): Id.t list =
-  match e with
-  | IfEq((a, b), t, els) | IfLE((a, b), t, els) -> find_locals_vars t @ find_locals_vars els
-  | Let((id, t), value, next) -> [id] @ find_locals_vars next
-  | LetRec(fd, next) -> find_locals_vars next
-  | _ -> []
-
-(* 
-  Extrait la liste des variables libres d'une fonction
-  Paramètres:
-  - code -> le code de la fonction
-  - args -> les arguments de la fonction
-  - locals -> les variables locales de la fonction
-  - funcs -> les noms des fonctions du programme
-  Retourne: une liste de Id.t
-*)
-let find_free_vars (code: Knorm.knorm_t) (args: Id.t list) (locals: Id.t list) (funcs: Id.t list): Id.t list =
-  let is_free (var: Id.t): bool =
-    let f x = x = var in
-    Bool.not (List.exists f args || List.exists f locals || List.exists f funcs)
+let rec fun_free_vars (env: VarSet.t) (parent: Id.t * VarSet.t) (exp: Knorm.knorm_t): VarSet.t =  
+  let find_id_type (id: Id.t): (Id.t * Type.t) =
+    let elems = VarSet.elements env in
+    List.find (fun (x,y) -> x = id) elems
   in
-  let rec worker (e: Knorm.knorm_t): Id.t list =
-    match e with
-    | Var id -> if is_free id then [id] else []
-    | Add(a, b) | Sub(a, b) -> (if is_free a then [a] else []) @ (if is_free b then [b] else [])
-    | IfEq((a, b), t, els) | IfLE((a, b), t, els) -> (if is_free a then [a] else []) @ (if is_free b then [b] else []) @
-                                                      worker t @ worker els
-    | Let((id, t), value, next) -> worker value @ worker next
-    | LetRec(fd, next) -> worker next
-    | App(name, a) -> List.filter_map (fun x -> if is_free x then Some x else None) a
-    | _ -> []
-  in
-  (*** Code de find_free_vars ***)
-  worker code
+  match exp with
+  | Var(id) when List.exists (fun (x, y) -> x = id) (VarSet.elements env) -> VarSet.singleton (find_id_type id)
+  | Add(a, b) | Sub(a, b) ->
+    let set = VarSet.singleton (find_id_type a) in
+    VarSet.add (find_id_type b) set
+  | IfEq((a, b), th, els) | IfLE((a, b), th, els) ->
+    let a' = find_id_type a in
+    let b' = find_id_type b in
+    let env' = VarSet.add a' (VarSet.add b' env) in
+    let set = VarSet.add a' (VarSet.add b' (fun_free_vars env' parent th)) in
+    VarSet.union set (fun_free_vars env' parent els)
+  | Let((id, t), value, next) -> 
+    let env' = VarSet.add (id, t) env in
+    VarSet.union (fun_free_vars env' parent value) (VarSet.remove (id, t) (fun_free_vars env' parent next))
+  | LetRec(fd, next) -> 
+    let env' = VarSet.union (VarSet.of_list fd.args) env in
+    let set = VarSet.union (fun_free_vars env' parent fd.body) (fun_free_vars env parent next) in
+    VarSet.diff set (VarSet.of_list fd.args)
+  | App(name, args) when List.exists (fun (x,y) -> x = name) (VarSet.elements env) -> VarSet.add (find_id_type name) (VarSet.union (VarSet.of_list (List.map (fun x -> find_id_type x) args))
+    (if name == fst parent then snd parent else VarSet.empty))
+  | App(name, args) -> VarSet.union (VarSet.of_list (List.map (fun x -> find_id_type x) args))
+      (if name == fst parent then snd parent else VarSet.empty)
+  | _ -> VarSet.empty
 
 (* 
-  Créér les en-têtes des fonctions d'un programme
+  Convertit le programme et applique la closure conversion dessus
   Paramètres:
-  - ast -> l'ast d'un programme
-  Retourne: une liste de (funheader * Knorm.knorm_t)
+  - exp -> une expression de type knorm_t
+  Retourne: une liste de fundef (les fonctions) et une expression de type t (le code principal)
 *)
-let rec make_funcs_headers (ast: Knorm.knorm_t) (funcs_names: Id.t list): (funheader * Knorm.knorm_t) list =
+let convert (exp: Knorm.knorm_t): fundef list * t =
+  let funs = ref [] in
   (* 
-    Créer l'en-tête d'une fonction et celui des fonctions internes à celle-ci
+    Fonction utilitaire pour convert
     Paramètres:
-    - fd -> la définition de la fonction
-    - parent -> un pointeur sur le header de la fonction parent
-    Retourne: une liste de (funheader * Knorm.knorm_t)
+    - parent (optionnel): la fonction dans laquelle se trouve l'expression
+    - env: l'environnemnt de l'expression, un ensemble de variables
+    - e: l'expression à convertir
+    Retourne: l'expression e convertit en type t avec la closure conversion appliquée dessus
   *)
-  let rec make_func_header (fd: Knorm.fundef) (parent: funheader ref option): (funheader * Knorm.knorm_t) list =
-    (* Les arguments de la fonction *)
-    let args = List.map (fun x -> fst x) fd.args in
-    (* Les variables locales de la fonction *)
-    let locals = find_locals_vars fd.body in
-    (* Les variables libres de la fonction *)
-    let frees = find_free_vars fd.body args locals funcs_names in
-    (* L'en-tête de la fonction *)
-    let header = ref {label= gen_label (fst fd.name); args= args; frees= frees; locals= locals; parent= parent} in
-    (* 
-      Créér les en-têtes des sous-fonctions de la fonction 
-      Paramètres:   
-      - e -> le code la fonction
-      Retourne: une liste de (funheader * Knorm.knorm_t)
-    *)
-    let rec make_sub_funcs_headers (e: Knorm.knorm_t): (funheader * Knorm.knorm_t) list =
-      match e with
-      | Let((id, t), value, next) -> make_sub_funcs_headers next
-      | LetRec(fd, next) -> make_func_header fd (Some(header)) @ make_sub_funcs_headers next
-      | _ -> []
-    in
-    (*** Code de make_func_header  ***)
-    [(!header, fd.body)] @ make_sub_funcs_headers fd.body
-  in
-  match ast with
-    | Let((id, t), value, next) -> make_funcs_headers next funcs_names
-    | LetRec(fd, next) -> make_func_header fd None @ make_funcs_headers next funcs_names
-    | _ -> []
-
-(* 
-  Convertit et applique la closure conversion sur le code d'une fonction
-  Paramètres:
-  - header -> l'en-tête de la fonction
-  - code -> le code de la fonction
-  - funcs -> les headers des autres fonctions du programme
-  Retourne: le code convertit avec la closure conversion appliquée dessus
-*)
-let convert_func_body (header: funheader) (code: Knorm.knorm_t) (funcs: funheader list): t =
-  let is_func_name (var: Id.t): bool =
-    let label = gen_label var in
-    List.exists (fun x -> x.label = label) funcs
-  in
-  let find_header (var: Id.t): funheader =
-    let label = gen_label var in
-    List.find (fun x -> x.label = label) funcs
-  in
-  let rename (a: Id.t) (to_rename: (Id.t * Id.t) list): Id.t =
-    if List.exists (fun (x,y) -> x = a) to_rename then
-      snd (List.find (fun (x,y) -> x = a) to_rename)
-    else
-      a
-  in
-  let rec worker ?(to_rename: (Id.t * Id.t) list = []) (e: Knorm.knorm_t): t =
+  let rec worker ?(parent: Id.t * VarSet.t = ("", VarSet.empty)) (env: VarSet.t) (e: Knorm.knorm_t): t =
     match e with
+    | Unit -> Unit
+    | Var(id) when List.exists (fun x -> (genlabel id) = (fst x.label)) !funs ->
+        let label = genlabel id in
+        let f = List.find (fun x -> label = (fst x.label)) !funs in
+        let new_id = Id.genid () in
+        MakeCls((new_id, snd f.label), label, List.map fst f.frees, Var(new_id))
+    | Var(id) -> Var(id)
     | Int i -> Int(i)
-    | Var(id) -> if is_func_name id then
-                  let h = find_header id in
-                  if List.length h.frees = 0 then
-                   insert_let (MakeClosure(gen_label id, [])) (fun x -> x)
-                  else
-                   insert_let (MakeClosure(gen_label id, h.frees)) (fun x -> x)
-                 else 
-                  Var(id)
-    | Add(a, b) -> Add(rename a to_rename, rename b to_rename)
-    | Sub(a, b) -> Sub(rename a to_rename, rename b to_rename)
-    | IfEq((a, b), t, els) -> IfEq((rename a to_rename, rename b to_rename), worker t, worker els)
-    | IfLE((a, b), t, els) -> IfLE((rename a to_rename, rename b to_rename), worker t, worker els)
-    | Let((id, t), App(name, a), next) -> 
-      let h = find_header name in
-        if (List.length h.frees) = 0 then
-          Let(id, ApplyDirect(gen_label name, a), worker next)
-        else 
-          Let(id, MakeClosure(gen_label name, h.frees), 
-          let new_id = Id.genid () in
-          Let(new_id, ApplyClosure(id, a), worker ~to_rename:[(id, new_id)] next)
-          )
-    | Let((id, t), value, next) -> Let(id, worker value, worker next)
-    | LetRec(fd, next) -> worker next
-    | App(name, a) -> let h = find_header name in
-                         if (List.length h.frees) = 0 then
-                          ApplyDirect(gen_label name, a)
-                         else 
-                          insert_let (MakeClosure(gen_label name, h.frees)) (fun x -> match x with | Var id -> ApplyClosure(id, a) | _ -> Unit)
-    | _ -> Unit
-  in worker code
-
-(* 
-  Convertit et applique la closure conversion sur le code principal
-  Paramètres:
-  - code -> le code principal
-  - funcs -> les headers des fonctions du programme
-  Retourne: le code convertit avec la closure conversion appliquée dessus
-*)
-let convert_main (code: Knorm.knorm_t) (funcs: funheader list): t =
-  let is_func_name (var: Id.t): bool =
-    let label = gen_label var in
-    List.exists (fun x -> x.label = label) funcs
-  in
-  let find_header (var: Id.t): funheader =
-    let label = gen_label var in
-    List.find (fun x -> x.label = label) funcs
-  in
-  let rec worker (e: Knorm.knorm_t): t =
-    match e with
-    | Int i -> Int(i)
-    | Var id -> Var(id)
+    | Neg x -> Neg(x)
     | Add(a, b) -> Add(a, b)
     | Sub(a, b) -> Sub(a, b)
-    | IfEq((a, b), t, els) -> IfEq((a, b), worker t, worker els)
-    | IfLE((a, b), t, els) -> IfLE((a, b), worker t, worker els)
-    | Let((id, t), App(name, args), next) -> 
-      if is_func_name name then
-        let h = find_header name in
-        if List.length h.frees = 0 then
-          Let(id, ApplyDirect(gen_label name, args), worker next)
-        else
+    | IfEq((a, b), th, els) -> 
+        IfEq(a, b, worker env th, worker env els)
+    | IfLE((a, b), th, els) -> 
+        IfLE(a, b, worker env th, worker env els)
+    (* Les let qui contiennent le résultat de l'appel d'une fonction *)
+    | Let((id, t), App(name, args), next) when List.exists (fun x -> (fst x.label) = genlabel name) !funs ->
+        let env' = VarSet.add (id, t) env in
+        let f = List.find (fun x -> (fst x.label) = (genlabel name)) !funs in
+        if List.length f.frees > 0 then
           let new_id = Id.genid () in
-          Let(new_id, MakeClosure(gen_label name, h.frees), Let(id, ApplyClosure(new_id, args), worker next))
-      else
-        Let(id, ApplyClosure(name, args), worker next)
-    | Let((id, t), value, next) -> Let(id, worker value, worker next)
-    | LetRec(fd, next) -> worker next
-    | App(name, args) -> 
-      if is_func_name name then
-        let h = find_header name in
-        if (List.length h.frees) = 0 then
-          ApplyDirect(gen_label name, args)
-        else 
-          insert_let (MakeClosure(gen_label name, h.frees)) (fun x -> match x with | Var id -> ApplyClosure(id, args) | _ -> Unit)
-        else if Typechecker.is_prefef_fun name then
-          ApplyPredef(name, args)
+          MakeCls((id, t), genlabel name, List.map fst f.frees, 
+          Let((new_id, snd f.label), ApplyCls(id, args), worker env' next))
         else
-          ApplyClosure(name, args)
-    | _ -> Unit
-  in worker code
+          Let((id, t), ApplyDir(genlabel name, args), worker env' next)
+    | Let((id, t), value, next) -> 
+        let env' = VarSet.add (id, t) env in
+        Let((id, t), worker env value, worker env' next)
+    | LetRec(fd, next) ->
+      (* Ajout des paramètres de la fonction à l'environnement *)
+      let env' = VarSet.union (VarSet.of_list fd.args) env in
+      let label = genlabel (fst fd.name) in
+      let frees = VarSet.diff (fun_free_vars env' parent fd.body) (VarSet.of_list fd.args) in
+      (* Ajout temporaire de la fonction dans la liste des fonctions *)
+      funs := {label= (label, (snd fd.name)); args= fd.args; frees= VarSet.elements frees; code= Unit} :: !funs;
+      (* Conversion du corps de la fonction *)
+      let body' = worker ~parent:(fst fd.name, frees) env' fd.body in
+      (* Ajout correct de la fonction dans la liste des fonctions *)
+      funs := List.filter (fun x -> (fst x.label) <> label) !funs;
+      funs := {label= (label, (snd fd.name)); args= fd.args; frees= VarSet.elements frees; code= body'} :: !funs;
+      (* Conversion du code après la définition de la fonction *)
+      worker env next
+    (* Appel d'une fonction *)
+    | App(name, args) when List.exists (fun x -> (fst x.label) = (genlabel name)) !funs ->
+        let f = List.find (fun x -> (fst x.label) = (genlabel name)) !funs in
+        if List.length f.frees > 0 then
+          (* Fonction avec au moins une variable libre *)
+          let id = Id.genid () in
+          MakeCls((id, Type.Unit), genlabel name, List.map fst f.frees, ApplyCls(id, args))
+        else
+          (* Fonction sans variables libres *)
+          ApplyDir(genlabel name, args)
+    (* Appel d'une fonction prédéfinie (print_int par exemple) *)
+    | App(name, args) when Typechecker.is_prefef_fun name -> ApplyDir(name, args)
+    (* Appel d'une fonction dans une closure *)
+    | App(name, args) -> ApplyCls(name, args)
+    | _ -> failwith "Expression inconnue"
+  (*** Code de convert ***)
+  in (!funs, worker VarSet.empty exp)
 
 (* 
-  Réalise la closure conversion d'un programme
+  Réalise la closure conversion
   Paramètres:
-  - ast -> l'ast d'un programme
-  Retourne: l'ast du programme après closure conversion   
+  - ast -> l'ast du programme
+  Retourne: l'ast du programme avec la closure conversion appliquée dessus
 *)
 let closure (ast: Knorm.knorm_t): t =
-  let funcs = make_funcs_headers ast (find_funcs_names ast) in
-  let headers = List.map (fun x -> fst x) funcs in
-  let funcs = List.map (fun (x, y) -> (LetRec(x, convert_func_body x y headers))) funcs in
-  Prog(funcs, convert_main ast headers)
+  let funs, main = convert ast in
+  Prog(funs, main)
