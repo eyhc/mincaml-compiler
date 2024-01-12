@@ -1,4 +1,4 @@
-(*exemple de création d'un tuple et de manipulation de ses éléments pour tester la génération du code asml*)
+(*exemple de création d'un tuple et de manipulation de ses éléments pour tester la génération du code asml et arm*)
 let rec create_tuple a b c = (a, b, c) in
   let rec change_elements tuple = 
     let (x, y, z) = tuple in
