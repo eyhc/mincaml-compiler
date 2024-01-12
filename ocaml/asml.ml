@@ -163,7 +163,7 @@ let to_string (a:asml) : string =
 (* ======== POUR JORANNE ======== *)
 let string_id (x:id_or_imm) : string =
   match x with
-  | Var x -> sprintf "Var (%s)" (Id.to_string x)
+  | Var x -> sprintf "Var (\"%s\")" (Id.to_string x)
   | Const i -> sprintf "Const (%d)" i
 
 let rec string_exp (e:expr) = 
