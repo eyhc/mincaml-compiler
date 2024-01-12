@@ -319,18 +319,17 @@ let rec print_reg_expr reg_expr =
       Printf.printf "))";
   | Call (name) ->
       Printf.printf "Call(%s)" name 
-  | If (s,(s1,ios),asmt1,asmt2) -> 
+  | If (s,(s1,ios),regt1,regt2) -> 
     Printf.printf "If%s (%s," s s1;
     print_reg_expr ios;
     Printf.printf ") then \n";
-  (*  print_regtlist asmt1;*)
-    Printf.printf "\n else \n";
-  (* print_regtlist asmt2;*)
-    Printf.printf "\n";
+    print_list regt1;
+    Printf.printf "else \n";
+    print_list regt2;
   | Reg s -> Printf.printf  "Reg %s" s
   | Unit -> Printf.printf  "Unit"
 
-  let print_regt  regt =
+  and print_regt  regt =
   match regt with
   | Let (s, expr) -> Printf.printf "(Let (%s," s ;
       print_reg_expr expr;
@@ -345,15 +344,20 @@ let rec print_reg_expr reg_expr =
       print_reg_expr expr;
       Printf.printf ")) ";
 
-;;
-
-let rec print_reg_function reg_function =
+and print_reg_function reg_function =
   match reg_function with 
   | Fun f :: tl ->  Printf.printf "Function name: %s\n" f.name;
       Printf.printf "Body:\n";
       List.iter (fun regt -> print_regt regt) f.body;
       print_reg_function tl
   | [] -> ()
+
+  and print_list l = 
+    match l with 
+    | hd :: tl -> 
+      print_regt hd;
+      print_list tl
+    | [] -> ()
 ;;
 
 let asml = [(Main (LET ("x", VAL (Const 1), (LET ("y", VAL (Const 2), (LET ("a", (VAL (Const 8)),
