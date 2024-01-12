@@ -1,4 +1,4 @@
-(*exemple de programme manipulant des floats dans un tableau pour tester la génération de code asml*)
+(*exemple de programme manipulant des floats dans un tableau pour tester la génération de code asml et arm*)
 let tableau = Array.create 4 6.0 in
 let rec applyOperation t valeur =
   t.(0) <- t.(0) +. valeur; print_float(t.(0)); print_newline();
