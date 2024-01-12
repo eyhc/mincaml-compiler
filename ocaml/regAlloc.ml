@@ -309,7 +309,15 @@ let parcours asml =
   parcours_asml_list asml;
 ;;
 
-let rec print_reg_expr reg_expr =
+let rec print_reg_function reg_function =
+  match reg_function with 
+  | Fun f :: tl ->  Printf.printf "Function name: %s\n" f.name;
+      Printf.printf "Body:\n";
+      List.iter (fun regt -> print_regt regt) f.body;
+      print_reg_function tl
+  | [] -> ()
+
+and print_reg_expr reg_expr =
   match reg_expr with
   | Int i -> Printf.printf "(Int : %d)" i
   | Neg s -> Printf.printf "(Neg :%s)" s
@@ -345,14 +353,6 @@ let rec print_reg_expr reg_expr =
   | Load (s, expr) -> Printf.printf " (Load (%s," s;
       print_reg_expr expr;
       Printf.printf ")) "
-
-and print_reg_function reg_function =
-  match reg_function with 
-  | Fun f :: tl ->  Printf.printf "Function name: %s\n" f.name;
-      Printf.printf "Body:\n";
-      List.iter (fun regt -> print_regt regt) f.body;
-      print_reg_function tl
-  | [] -> ()
 
   and print_list l = 
     match l with 
