@@ -14,5 +14,5 @@ cleanest: clean
 test: all
 	@./../scripts/mincaml-test-parser.sh
 	@./../scripts/mincaml-test-typechecking.sh
-	@./../scripts/mincaml-test-front-end.sh
+	@bash ../scripts/mincaml-test-front-end.sh
 	@cat ../resultats_tests.txt
