@@ -1,3 +1,13 @@
+ocaml/mincamlc
+ocaml/min.ml
+ocaml/.vscode/
+ocaml/_build/
+
+tests/gen-code/*.actual
+tests/gen-code/*.asml
+resultats_tests.txt
+
+
 *.annot
 *.cmo
 *.cma
@@ -23,3 +33,7 @@ setup.log
 .merlin
 
 *.asm
+.vscode
+*/*.mml
+*.s
+*/*.s
