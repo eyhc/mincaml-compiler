@@ -79,14 +79,9 @@ let rec generation_expr (a:Closure.t) : expr =
     IFEQ((x, Var y), generation_asmt at1, generation_asmt at2)
   | IfLE (x, y, at1, at2) ->
     IFLE((x, Var y), generation_asmt at1, generation_asmt at2)
-<<<<<<< HEAD
   | ApplyDir(f, vars) -> if Typechecker.is_prefef_fun f then call_predef f vars else failwith "todo"
 
   (* | MakeClosure (f, ys) -> failwith "todo" *)
-=======
-  | ApplyPredef (f, vars) -> call_predef f vars
-  | ApplyDirect (l, vars) -> call_predef l vars
->>>>>>> development
   | _ -> assert false
 
 
