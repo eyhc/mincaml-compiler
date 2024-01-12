@@ -147,3 +147,4 @@ let generate_asm_reg (defs: letregdef list) : string list =
       ]
     in
     let asm_code = generate_asm_internal [] defs in [header] @ asm_code
+  *)
