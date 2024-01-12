@@ -1,4 +1,4 @@
-(*exemple de modification de la valeur d'un élément d'un tableau pour tester la génération de code asml*)
+(*exemple de modification de la valeur d'un élément d'un tableau pour tester la génération de code asml et arm*)
 let rec modify_value tableau index valeur = 
   let old_value = tableau.(index) in
   (tableau.(index) <- valeur;

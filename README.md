@@ -1,8 +1,6 @@
-# Projet M1 INFO - Compilateur Ocaml
+# Projet M1 INFO - Compilateur MinCaml
 
 ## Groupe : LesPerdus
-
-LES NOMS ???:
 
 
 ## Compilation
@@ -34,6 +32,13 @@ ocaml/mincamlc test.mml -asml
 Pour compiler vers ARM :
 ```sh
 ocaml/mincamlc test.mml -o test.s
+```
+
+### Tests avec qemu
+
+```
+cp ocaml/*.s ARM/
+make test
 ```
 
 ### Debug

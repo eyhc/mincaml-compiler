@@ -1,38 +1,8 @@
 open RegAlloc
 
 let header : string =
-".data
-f_float:   .asciz \"%f\"
-f_int:     .asciz \"%d\"
-f_newline: .asciz \"\\n\"
-
-.text
+".text
 .global main
-
-@relai
-R_fint: .word f_int
-R_newl: .word f_newline
-
-_min_caml_print_int:
-push {lr}
-mov r1, r0
-ldr r0, R_fint
-bl printf
-pop {lr}
-bx lr
-
-_min_caml_print_newline:
-push {lr}
-ldr r0, R_newl
-bl printf
-pop {lr}
-bx lr
-
-_min_caml_abs:
-push {lr}
-bl abs
-pop {lr}
-bx lr
 
 "
 
@@ -44,6 +14,7 @@ let generate_if_label () =
   label
 
 let rec count_lets_in_regt : regt -> int = function
+  | Let (s, _) when List.mem s ["r0"; "r1"; "r2"; "r3"] -> 0
   | Let (_, _) -> 1
   | Exp _ | Store (_, _) | Load (_, _) -> 0
 
@@ -147,4 +118,4 @@ let generate_asm_reg (defs: letregdef list) : string list =
       ]
     in
     let asm_code = generate_asm_internal [] defs in [header] @ asm_code
-*)
+  *)

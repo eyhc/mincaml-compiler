@@ -79,9 +79,14 @@ let rec generation_expr (a:Closure.t) : expr =
     IFEQ((x, Var y), generation_asmt at1, generation_asmt at2)
   | IfLE (x, y, at1, at2) ->
     IFLE((x, Var y), generation_asmt at1, generation_asmt at2)
+<<<<<<< HEAD
   | ApplyDir(f, vars) -> if Typechecker.is_prefef_fun f then call_predef f vars else failwith "todo"
 
   (* | MakeClosure (f, ys) -> failwith "todo" *)
+=======
+  | ApplyPredef (f, vars) -> call_predef f vars
+  | ApplyDirect (l, vars) -> call_predef l vars
+>>>>>>> development
   | _ -> assert false
 
 
@@ -157,3 +162,60 @@ let rec to_string_letdef (l:letdef) : string =
 
 let to_string (a:asml) : string =
   List.fold_left (fun acc s -> acc ^ "\n" ^ (to_string_letdef s)) "" a
+
+
+(* ======== POUR JORANNE ======== *)
+let string_id (x:id_or_imm) : string =
+  match x with
+  | Var x -> sprintf "Var (\"%s\")" (Id.to_string x)
+  | Const i -> sprintf "Const (%d)" i
+
+let rec string_exp (e:expr) = 
+  match e with
+  | NOP -> "NOP"
+  | VAL v -> sprintf "VAL (%s)" (string_id v)
+  | LABEL l -> sprintf "LABEL (\"%s\")" (Id.to_string l)
+  | NEG v -> sprintf "NEG (\"%s\")" (Id.to_string v)
+  | ADD (v1,v2) -> sprintf "ADD (\"%s\", %s)" (Id.to_string v1) (string_id v2)
+  | SUB (v1,v2) -> sprintf "SUB (\"%s\", %s)" (Id.to_string v1) (string_id v2)
+  | FNEG v -> sprintf "FNEG (\"%s\")" (Id.to_string v)
+  | FADD (v1,v2) -> sprintf "FADD (\"%s\", %s)" (Id.to_string v1) (Id.to_string v2)
+  | FSUB (v1,v2) -> sprintf "FSUB (\"%s\", %s)" (Id.to_string v1) (Id.to_string v2)
+  | FMUL (v1,v2) -> sprintf "FMUL (\"%s\", %s)" (Id.to_string v1) (Id.to_string v2)
+  | FDIV (v1,v2) -> sprintf "FDIV (\"%s\", %s)" (Id.to_string v1) (Id.to_string v2)
+  | NEW v -> sprintf "NEW (%s)" (string_id v)
+  | MEMGET (v1,v2) -> sprintf "MEMGET (\"%s\", %s)" (Id.to_string v1) (string_id v2)
+  | MEMASSIGN (v1,v2,v3) -> sprintf "(MEMASSIGN (\"%s\", %s, \"%s\")" v1 (string_id v2) v3
+  | IFEQ ((v, vd), a1, a2) ->
+    let sa1 = string_asmt a1 and sa2 = string_asmt a2 in
+      sprintf "IFEQ ((\"%s\", %s), %s, %s)" (Id.to_string v) (string_id vd) sa1 sa2
+  | IFLE ((v, vd), a1, a2) ->
+    let sa1 = string_asmt a1 and sa2 = string_asmt a2 in
+      sprintf "IFLE ((\"%s\", %s), %s, %s)" (Id.to_string v) (string_id vd) sa1 sa2
+  | IFGE ((v, vd), a1, a2) ->
+    let sa1 = string_asmt a1 and sa2 = string_asmt a2 in
+      sprintf "IFGE ((\"%s\", %s), %s, %s)" (Id.to_string v) (string_id vd) sa1 sa2
+  | IFFEQUAL ((v, v2), a1, a2) ->
+    let sa1 = string_asmt a1 and sa2 = string_asmt a2 in
+      sprintf "IFFEQUAL ((\"%s\", \"%s\"), %s, %s)" (Id.to_string v) (Id.to_string v2) sa1 sa2
+  | IFFLE ((v, v2), a1, a2) ->
+    let sa1 = string_asmt a1 and sa2 = string_asmt a2 in
+      sprintf "IFFLE ((\"%s\", \"%s\"), %s, %s)" (Id.to_string v) (Id.to_string v2) sa1 sa2
+  | CALL (label,args) -> sprintf "CALL (\"%s\", [%s])"
+    (Id.to_string label) (Syntax.infix_to_string (fun x -> sprintf "\"%s\"" (Id.to_string x)) args ";")
+  | CALLCLO (label,args) -> "CALLCLO (\"todo\", [])"
+
+and string_asmt (a:asmt) : string =
+  match a with
+  | LET (v, e, a) -> 
+    sprintf "LET (\"%s\", %s, %s)" (Id.to_string v) (string_exp e) (string_asmt a)
+  | EXP e -> sprintf "EXP (%s)" (string_exp e)
+
+let rec string_letdef (l:letdef) : string =
+  match l with
+  | Main asmt -> sprintf "Main (%s)" (string_asmt asmt)
+  | LetFloat f -> failwith "todo"
+  | LetLabel (l, args, asmt) -> failwith "todo"
+
+let string_struct (a:asml) =
+  sprintf "[%s]" (Syntax.infix_to_string string_letdef a ";")
