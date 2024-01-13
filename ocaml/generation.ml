@@ -20,11 +20,15 @@ let rec count_lets_in_regt : regt -> int = function
 
 let rec count_lets_in_reg_function : reg_function -> int =
   fun { body; _ } -> List.fold_left (fun acc stmt -> acc + count_lets_in_regt stmt) 0 body
-
+   
   and generate_asm_regt : regt -> string list = function
   | Let (s, expr) ->
     (match expr with
-      | Int n -> [Printf.sprintf "mov %s, #%d" s n]
+      | Int n ->
+        if n <= 255 then
+          [Printf.sprintf "mov %s, #%d" s n]
+        else
+          [Printf.sprintf "ldr %s, =#%d" s n]
       | Reg reg -> [Printf.sprintf "mov %s, %s" s reg]
       | Add (s1, expr) ->
         (match expr with
@@ -52,7 +56,11 @@ let rec count_lets_in_reg_function : reg_function -> int =
       Printf.sprintf "%s:" true_label ::
       List.concat (List.map generate_asm_regt true_branch) @
       Printf.sprintf "%s:" end_label :: []
-    | Int n -> [Printf.sprintf "mov r0, #%d" n]
+    | Int n ->
+      if n <= 255 then
+        [Printf.sprintf "mov r0, #%d" n]
+      else
+        [Printf.sprintf "ldr r0, =#%d" n]      
     | Reg reg -> [Printf.sprintf "mov r0, %s" reg]
     | Call (func_name) -> [Printf.sprintf "bl %s" func_name;]
     | Unit -> []
