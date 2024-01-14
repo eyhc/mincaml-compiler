@@ -32,12 +32,20 @@ let rec count_lets_in_reg_function : reg_function -> int =
       | Reg reg -> [Printf.sprintf "mov %s, %s" s reg]
       | Add (s1, expr) ->
         (match expr with
-        | Int n -> [Printf.sprintf "add %s, %s, #%d" s s1 n]
+        | Int n -> 
+          if n <= 255 then
+            [Printf.sprintf "add %s, %s, #%d" s s1 n]
+          else
+            [Printf.sprintf "ldr %s, =#%d" s n; Printf.sprintf "add %s, %s, %s" s s1 s]
         | Reg reg -> [Printf.sprintf "add %s, %s, %s" s s1 reg]
         | _ -> assert false)
       | Sub (s1, expr) ->
         (match expr with
-        | Int n -> [Printf.sprintf "sub %s, %s, #%d" s s1 n]
+        | Int n -> 
+          if n <= 255 then
+            [Printf.sprintf "sub %s, %s, #%d" s s1 n]
+          else
+            [Printf.sprintf "ldr %s, =#%d" s n; Printf.sprintf "sub %s, %s, %s" s s1 s]
         | Reg reg -> [Printf.sprintf "sub %s, %s, %s" s s1 reg]
         | _ -> assert false)
       | Call (func_name) -> [Printf.sprintf "bl %s" func_name; Printf.sprintf "mov %s, r0" s]
@@ -91,39 +99,3 @@ let generate_asm_reg (defs: letregdef list) : string list =
     in
     let asm_code = generate_asm_internal [] defs in [header] @ asm_code
   
-  (* let () =
-    let result_asm_reg =
-      generate_asm_reg
-      [Fun
-        {
-          name = "main";
-          body =
-          [
-            Let ("r5", Int 2);
-            Let ("r4", Neg "r5");
-            Let ("r0", Reg "r4");
-            Exp(Call("_min_caml_print_int"));
-            Exp(Call("_min_caml_print_newline")) ;
-            Store (Reg "r4", "[fp , #-4]"); Let ("r5", Int 2);
-            Store (Reg "r5", "[fp , #-8]"); Load ("[fp , #-4]", Reg "r5");
-            Load ("[fp , #-8]", Reg "r4"); Store (Reg "r4", "[fp , #-8]");
-            Store (Reg "r5", "[fp , #-4]");
-            Let ("r5"      print_int c, Add ("r5", Int 5)); Let ("r5", Add ("r5", Reg "r4"));
-            Store (Reg "r5", "[fp , #-4]");
-            Let ("r5", Call("_f"))
-          ]
-        }
-  
-        Fun
-        {
-          name = "_f";
-          body =
-          [
-            Let ("r0", Add ("r5", Int 5))
-          ]
-        }
-  
-      ]
-    in
-    let asm_code = generate_asm_internal [] defs in [header] @ asm_code
-  *)
