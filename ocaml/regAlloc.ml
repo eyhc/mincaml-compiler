@@ -274,11 +274,6 @@ let parcours asml =
   let rec parcours_asmt asmt bd var_to_register =
     match asmt with
     | LET (var1, var2, exp) -> 
-        Printf.printf "Let %s\n" var1;
-        print_free !reg_available;
-        print_hashtable var_to_register;
-        Printf.printf "-----------------\n";
-        
         let active = get_intervals_i asmt var_to_register in
         store_load active bd var_to_register;
         let r = Hashtbl.find var_to_register var1 in
@@ -324,7 +319,6 @@ let parcours asml =
     | _ -> Unit
 
   and parcours_if ifexpr s i_o_s asmt1 asmt2 var_to_register =
-    let old = create_copy_hash var_to_register in 
     let reg = !reg_available in
     let s1 = Hashtbl.find var_to_register s in
     let i = parcours_id_or_im i_o_s var_to_register in
