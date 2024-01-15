@@ -19,7 +19,7 @@ and back_print = ref false
 
 
 (* -n_iter *)
-let n_iter_optim = ref 500
+let n_iter_optim = ref 100
 
 let usage_msg = Printf.sprintf "Usage: %s [options]" (Array.get Sys.argv 0)
 
@@ -38,7 +38,7 @@ let speclist = [
   ("-let", Arg.Unit(fun () -> let_reduc :=true), "Reduction of nested let-expression");
   ("-closure", Arg.Unit(fun () -> closure :=true), "Closure conversion");
   ("-optim", Arg.Unit(fun () -> optim :=true), "test optimisation");
-  ("-back", Arg.Unit(fun () -> back_print :=true), "Back code intermediaire")
+  ("-back", Arg.Unit(fun () -> back_print :=true), "Back code intermediaire");
 ]
 
 (* SHOW HELP IN TERM (-h option) *)
@@ -101,7 +101,7 @@ let print_optim ast =
   let res = Beta.reduction res in 
   let res = Reduction.reduction res in
   let res = Inline.expansion res in
-  let res = Elim.elim_definition res in
+  let res = Constant.constant res in
   print_endline (Knorm.to_string res)
 
 let print_closure ast =
@@ -117,13 +117,11 @@ let iter_optim ast =
     if n = 0 then ast
     else
       let a = Beta.reduction ast in          (* Beta reduction *)
-      let a = Inline.expansion a in          (* Inline expansion *)
-                                             (* Constant folding *)
-      let a = Elim.elim_definition a in      (* Elim. unnecessary def *)
       let a = Reduction.reduction a in       (* Reduction of nested-let *)
-      iter_rec a (n-1) (* to_do : ne plus itérérer si on atteint un point fixe *)
+      let a = Inline.expansion a in          (* Inline expansion *)
+      (* Constant folding | Elim. unnecessary def *)
+      a (* to_do : ne plus itérérer si on atteint un point fixe *)
   in iter_rec ast !n_iter_optim
-
 
 let print_back ast =
   Typechecker.type_check ast;
