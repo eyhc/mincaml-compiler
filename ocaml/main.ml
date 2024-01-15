@@ -19,7 +19,7 @@ and back_print = ref false
 
 
 (* -n_iter *)
-let n_iter_optim = ref 100
+let n_iter_optim = ref 500
 
 let usage_msg = Printf.sprintf "Usage: %s [options]" (Array.get Sys.argv 0)
 
@@ -101,6 +101,7 @@ let print_optim ast =
   let res = Beta.reduction res in 
   let res = Reduction.reduction res in
   let res = Inline.expansion res in
+  let res = Elim.elim_definition res in
   print_endline (Knorm.to_string res)
 
 let print_closure ast =
@@ -116,10 +117,11 @@ let iter_optim ast =
     if n = 0 then ast
     else
       let a = Beta.reduction ast in          (* Beta reduction *)
-      let a = Reduction.reduction a in       (* Reduction of nested-let *)
       let a = Inline.expansion a in          (* Inline expansion *)
-      (* Constant folding | Elim. unnecessary def *)
-      a (* to_do : ne plus itérérer si on atteint un point fixe *)
+                                             (* Constant folding *)
+      let a = Elim.elim_definition a in      (* Elim. unnecessary def *)
+      let a = Reduction.reduction a in       (* Reduction of nested-let *)
+      iter_rec a (n-1) (* to_do : ne plus itérérer si on atteint un point fixe *)
   in iter_rec ast !n_iter_optim
 
 
@@ -161,7 +163,7 @@ let print_asml f =
     let ast = Closure.closure ast in         (* Closure conversion *)
     let asml = Asml.generation ast in        (* ASML generation *)
                                              (* Immediate optimisation *)
-    print_endline (Asml.string_struct asml)      (* Displaying *)
+    print_endline (Asml.to_string asml)      (* Displaying *)
 
 
 (* Compile code file f to arm (32?) *)
