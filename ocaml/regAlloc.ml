@@ -41,7 +41,7 @@ let print_intervals intervals =
     ) intervals
 
 (* Nombres de registres pour les variables locales *)
-let num_registers = 3
+let num_registers = 7
  
 (* Hashmap des variables sur la pile avec leurs adresses, exemple : "x" -> "[fp, #4]" *)
 let var_in_stack = Hashtbl.create 0
@@ -50,7 +50,7 @@ let var_in_stack = Hashtbl.create 0
  * hashtable binding variable to register,
  * a : r1 -> variable `a` is in register `r1` 
 *)
-let reg_available = ref ["r4";"r5";"r6"];;
+let reg_available = ref ["r4";"r5";"r6";"r7";"r8";"r9";"r10"];;
 
 let intersection_keys hashtable list = 
   let result = ref [] in 
