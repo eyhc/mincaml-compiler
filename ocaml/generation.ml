@@ -1,16 +1,20 @@
 open RegAlloc
 
-let header : string =
-".text
-.global main
-
-"
+let header : string list ref = ref [".text"; ".global main"; ""]
+let consts : string list ref = ref []
+let floats : string list ref = ref []
 
 let if_label_counter = ref 0
+let num_label_counter = ref 0
 
 let generate_if_label () =
   let label = "l" ^ string_of_int !if_label_counter in
   if_label_counter := !if_label_counter + 1;
+  label
+
+let generate_num_label () =
+  let label = "const_" ^ string_of_int !num_label_counter in
+  num_label_counter := !num_label_counter + 1;
   label
 
 let rec count_lets_in_regt : regt -> int = function
@@ -26,55 +30,55 @@ let rec count_lets_in_reg_function : reg_function -> int =
     (match expr with
       | Int n ->
         if n <= 255 then
-          [Printf.sprintf "mov %s, #%d" s n]
+          [Printf.sprintf "\tmov %s, #%d" s n]
         else
-          [Printf.sprintf "ldr %s, =#%d" s n]
-      | Reg reg -> [Printf.sprintf "mov %s, %s" s reg]
+          [Printf.sprintf "\tldr %s, =#%d" s n]
+      | Reg reg -> [Printf.sprintf "\tmov %s, %s" s reg]
       | Add (s1, expr) ->
         (match expr with
         | Int n -> 
           if n <= 255 then
-            [Printf.sprintf "add %s, %s, #%d" s s1 n]
+            [Printf.sprintf "\tadd %s, %s, #%d" s s1 n]
           else
-            [Printf.sprintf "ldr %s, =#%d" s n; Printf.sprintf "add %s, %s, %s" s s1 s]
-        | Reg reg -> [Printf.sprintf "add %s, %s, %s" s s1 reg]
+            [Printf.sprintf "\tldr %s, =#%d" s n; Printf.sprintf "\tadd %s, %s, %s" s s1 s]
+        | Reg reg -> [Printf.sprintf "\tadd %s, %s, %s" s s1 reg]
         | _ -> assert false)
       | Sub (s1, expr) ->
         (match expr with
         | Int n -> 
           if n <= 255 then
-            [Printf.sprintf "sub %s, %s, #%d" s s1 n]
+            [Printf.sprintf "\tsub %s, %s, #%d" s s1 n]
           else
-            [Printf.sprintf "ldr %s, =#%d" s n; Printf.sprintf "sub %s, %s, %s" s s1 s]
-        | Reg reg -> [Printf.sprintf "sub %s, %s, %s" s s1 reg]
+            [Printf.sprintf "\tldr %s, =#%d" s n; Printf.sprintf "\tsub %s, %s, %s" s s1 s]
+        | Reg reg -> [Printf.sprintf "\tsub %s, %s, %s" s s1 reg]
         | _ -> assert false)
-      | Call (func_name) -> [Printf.sprintf "bl %s" func_name; Printf.sprintf "mov %s, r0" s]
-      | Neg s1 -> [Printf.sprintf "neg %s, %s" s s1]
-      | Unit -> [Printf.sprintf "mov %s, #0" s]
+      | Call (func_name) -> [Printf.sprintf "\tbl %s" func_name; Printf.sprintf "\tmov %s, r0" s]
+      | Neg s1 -> [Printf.sprintf "\tneg %s, %s" s s1]
+      | Unit -> [Printf.sprintf "\tmov %s, #0" s]
       | _ -> assert false)
   | Exp exp ->
   (match exp with
     | If (cmp_type, (r1, Reg r2), true_branch, false_branch) ->
       let true_label = generate_if_label () in
       let end_label = generate_if_label () in
-      Printf.sprintf "cmp %s, %s" r1 r2 ::
-      Printf.sprintf "b%s %s" cmp_type true_label ::
+      Printf.sprintf "\tcmp %s, %s" r1 r2 ::
+      Printf.sprintf "\tb%s %s" cmp_type true_label ::
       List.concat (List.map generate_asm_regt false_branch) @
-      Printf.sprintf "b %s" end_label ::
-      Printf.sprintf "%s:" true_label ::
+      Printf.sprintf "\tb %s" end_label ::
+      Printf.sprintf "\t%s:" true_label ::
       List.concat (List.map generate_asm_regt true_branch) @
-      Printf.sprintf "%s:" end_label :: []
+      Printf.sprintf "\t%s:" end_label :: []
     | Int n ->
       if n <= 255 then
-        [Printf.sprintf "mov r0, #%d" n]
+        [Printf.sprintf "\tmov r0, #%d" n]
       else
-        [Printf.sprintf "ldr r0, =#%d" n]      
-    | Reg reg -> [Printf.sprintf "mov r0, %s" reg]
-    | Call (func_name) -> [Printf.sprintf "bl %s" func_name;]
+        [Printf.sprintf "\tldr r0, =#%d" n]      
+    | Reg reg -> [Printf.sprintf "\tmov r0, %s" reg]
+    | Call (func_name) -> [Printf.sprintf "\tbl %s" func_name;]
     | Unit -> []
     | _ -> assert false)
-  | Store (Reg reg, mem) -> [Printf.sprintf "str %s, %s" reg mem]
-  | Load (s, Reg reg) -> [Printf.sprintf "ldr %s, %s" reg s]
+  | Store (Reg reg, mem) -> [Printf.sprintf "\tstr %s, %s" reg mem]
+  | Load (s, Reg reg) -> [Printf.sprintf "\tldr %s, %s" reg s]
   | _ -> assert false
 
 and generate_asm_fun_internal : reg_function -> string list = fun { name; body } ->
@@ -82,10 +86,16 @@ and generate_asm_fun_internal : reg_function -> string list = fun { name; body }
   [Printf.sprintf "%s:" name] @ generate_prologue size @ List.concat (List.map generate_asm_regt body) @ generate_epilogue
 
 and generate_prologue size =
-  ["push {fp, lr}"; "add fp, sp, #0"; "add sp, sp, #-" ^ string_of_int (size * 4)]
-
+  if size * 4 <= 255 then
+    ["\tpush {fp, lr}"; "\tadd fp, sp, #0"; "\tsub sp, sp, #" ^ string_of_int (size * 4)]
+  else
+    let label = generate_num_label () in
+    consts := !consts @ [label ^ ": .word " ^ string_of_int (size * 4) ^ "\n"];
+    ["\tpush {fp, lr}"; "\tadd fp, sp, #0"; "\tldr sp, " ^ label;
+                "\tsub sp, fp, sp"]
+  
 and generate_epilogue =
-  ["add sp, fp, #0"; "pop {fp, lr}"; "bx lr\n"]
+  ["\tadd sp, fp, #0"; "\tpop {fp, lr}"; "\tbx lr\n"]
 
 let generate_asm_reg (defs: letregdef list) : string list =
   match defs with
@@ -97,5 +107,4 @@ let generate_asm_reg (defs: letregdef list) : string list =
         let asm_hd = match hd with Fun f -> generate_asm_fun_internal f in
         generate_asm_internal (acc @ asm_hd) tl
     in
-    let asm_code = generate_asm_internal [] defs in [header] @ asm_code
-  
+    let asm_code = generate_asm_internal [] defs in !header @ !consts @ !floats @ asm_code
