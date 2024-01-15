@@ -1,16 +1,20 @@
 open RegAlloc
 
-let header : string =
-".text
-.global main
-
-"
+let header : string list ref = ref [".text"; ".global main"; ""]
+let consts : string list ref = ref []
+let floats : string list ref = ref []
 
 let if_label_counter = ref 0
+let num_label_counter = ref 0
 
 let generate_if_label () =
   let label = "l" ^ string_of_int !if_label_counter in
   if_label_counter := !if_label_counter + 1;
+  label
+
+let generate_num_label () =
+  let label = "const_" ^ string_of_int !num_label_counter in
+  num_label_counter := !num_label_counter + 1;
   label
 
 let rec count_lets_in_regt : regt -> int = function
@@ -82,8 +86,14 @@ and generate_asm_fun_internal : reg_function -> string list = fun { name; body }
   [Printf.sprintf "%s:" name] @ generate_prologue size @ List.concat (List.map generate_asm_regt body) @ generate_epilogue
 
 and generate_prologue size =
-  ["push {fp, lr}"; "add fp, sp, #0"; "add sp, sp, #-" ^ string_of_int (size * 4)]
-
+  if size * 4 <= 255 then
+    ["push {fp, lr}"; "add fp, sp, #0"; "sub sp, sp, #" ^ string_of_int (size * 4)]
+  else
+    let label = generate_num_label () in
+    consts := !consts @ [label ^ ": .word " ^ string_of_int (size * 4) ^ "\n"];
+    ["push {fp, lr}"; "add fp, sp, #0"; "ldr sp, " ^ label;
+                "sub sp, fp, sp"]
+  
 and generate_epilogue =
   ["add sp, fp, #0"; "pop {fp, lr}"; "bx lr\n"]
 
@@ -97,5 +107,4 @@ let generate_asm_reg (defs: letregdef list) : string list =
         let asm_hd = match hd with Fun f -> generate_asm_fun_internal f in
         generate_asm_internal (acc @ asm_hd) tl
     in
-    let asm_code = generate_asm_internal [] defs in [header] @ asm_code
-  
+    let asm_code = generate_asm_internal [] defs in !header @ !consts @ !floats @ asm_code
