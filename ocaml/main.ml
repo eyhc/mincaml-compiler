@@ -117,7 +117,7 @@ let iter_optim ast =
     else
       let a = Beta.reduction ast in          (* Beta reduction *)
       let a = Reduction.reduction a in       (* Reduction of nested-let *)
-      let a = Inline.expansion a in          (* Inline expansion *)
+      (*let a = Inline.expansion a in*)          (* Inline expansion *)
       (* Constant folding | Elim. unnecessary def *)
       a (* to_do : ne plus itérérer si on atteint un point fixe *)
   in iter_rec ast !n_iter_optim
@@ -161,7 +161,7 @@ let print_asml f =
     let ast = Closure.closure ast in         (* Closure conversion *)
     let asml = Asml.generation ast in        (* ASML generation *)
                                              (* Immediate optimisation *)
-    print_endline (Asml.string_struct asml)      (* Displaying *)
+    print_endline (Asml.to_string asml)      (* Displaying *)
 
 
 (* Compile code file f to arm (32?) *)

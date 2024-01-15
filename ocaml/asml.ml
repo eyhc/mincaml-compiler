@@ -65,7 +65,60 @@ let call_predef (f:Id.l) (vars:Id.t list) : expr =
   | "truncate" -> CALL ("_min_caml_truncate", vars)
   | _ -> failwith (sprintf "asml generation : %s not a predef function" f)
 
-let rec generation_expr (a:Closure.t) : expr =
+let funsdef: Closure.fundef list ref = ref [];;
+
+let get_fdef (name: Id.t): Closure.fundef =
+  List.find (fun (x: Closure.fundef) -> fst x.label = name) !funsdef
+
+let is_freefun (name: Id.t): bool =
+  if List.exists (fun (x: Closure.fundef) -> (fst x.label) = name) !funsdef then
+    let f = List.find (fun (x: Closure.fundef) -> (fst x.label) = name) !funsdef in
+    List.length f.frees > 0
+  else
+    false
+
+let rec frees_mem_assign (p: Id.t) (n: int) (frees: Id.t list) (next: asmt): asmt =
+  match frees with
+  | [x] -> LET(Id.genid (), MEMASSIGN(p, Const(n), x), next)
+  | x :: tail -> LET(Id.genid (), MEMASSIGN(p, Const(n), x), frees_mem_assign p (n+4) tail next)
+  | _ -> assert false
+
+let make_closure (id: Id.t) (f: Id.t) (frees: Id.t list) (next: asmt): asmt =
+  let size = (List.length frees + 1) * 4 in
+  let addr_id = Id.genid () in
+  let mem_frees = frees_mem_assign id 0 (addr_id :: frees) next in
+  let f_addr = LET(addr_id, LABEL(f), mem_frees) in
+  let pointer = LET(id, NEW(Const(size)), f_addr) in
+  pointer
+
+let rec generation_let_with_apply (id: Id.t) (f: Id.t) (args: Id.t list) (next: Closure.t): asmt =
+  (* L'ensemble des arguments qui sont des fonctions avec au moins une variable libre *)
+  let freefuns_args = List.filter (fun x -> is_freefun x) args in
+  if List.length freefuns_args > 0 then
+    (* La liste des arguments à remplacer dans le call *)
+    let args_ids = (List.map (fun x -> (x, Id.genid ())) freefuns_args) in
+    let get_id (x: Id.t) : Id.t =
+      snd (List.find (fun (y, z) -> y = x) args_ids)
+    in
+    let rec funs_as_params (names: Id.t list) (next: asmt): asmt =
+      match names with
+      | [x] -> let f = get_fdef x in make_closure (get_id x) (fst f.label) (List.map fst f.frees) next
+      | x :: tail -> let f = get_fdef x in make_closure (get_id x) (fst f.label) (List.map fst f.frees) (funs_as_params tail next)
+      | _ -> assert false
+    in
+    (* Le call avec les arguments mis à jour *)
+    let call = CALL(f, List.map (fun x -> if List.exists (fun y -> (fst y) = x) args_ids then snd (List.find (fun y -> (fst y) = x) args_ids) else x) args) in
+    let call = LET(id, call, generation_asmt next) in
+    funs_as_params freefuns_args call
+  else
+    LET(id, 
+    (if Typechecker.is_prefef_fun f then
+      call_predef f args
+    else
+      CALL(f, args))
+    , generation_asmt next)
+
+and generation_expr (a:Closure.t) : expr =
   match a with
   | Unit -> NOP
   | Int i -> VAL (Const i)
@@ -80,22 +133,32 @@ let rec generation_expr (a:Closure.t) : expr =
   | IfLE (x, y, at1, at2) ->
     IFLE((x, Var y), generation_asmt at1, generation_asmt at2)
   | ApplyDir(f, vars) -> if Typechecker.is_prefef_fun f then call_predef f vars else CALL(f, vars)
-
-  (* | MakeClosure (f, ys) -> failwith "todo" *)
+  | ApplyCls(l, vars) -> CALLCLO(l, vars)
   | _ -> assert false
-
 
 and generation_asmt (a:Closure.t) : asmt = 
  match a with
+ | MakeCls((x, t), l, args, e1) -> 
+    let f = get_fdef l in
+    make_closure x (fst f.label) (List.map fst f.frees) (generation_asmt e1)
+ | Let((x, t), ApplyDir(f, args), e1) -> generation_let_with_apply x f args e1
  | Let ((x, t), e1, e2) -> LET(x, generation_expr e1, generation_asmt e2)
  | _ -> EXP (generation_expr a)
 
 let rec generation_letdef (a:Closure.fundef) : letdef =
-  LetLabel (fst a.label, List.map fst a.args, generation_asmt a.code)
+  let rec add_load_frees (n: int) (frees: Id.t list) (code: asmt) : asmt =
+    match frees with
+    | [] -> code
+    | [x] -> LET(x, MEMGET("%self", Const(n)), code)
+    | x :: tail -> LET(x, MEMGET("%self", Const(n)), add_load_frees (n+4) tail code)
+  in
+  LetLabel (fst a.label, List.map fst a.args, add_load_frees 4 (List.map fst a.frees) (generation_asmt a.code))
 
 let rec generation (ast:Closure.t) : asml = 
  match ast with
- | Prog (fcts, main) -> (List.map generation_letdef fcts) @ [Main (generation_asmt main)]
+ | Prog (fcts, main) -> 
+    funsdef := fcts;
+    (List.map generation_letdef fcts) @ [Main (generation_asmt main)]
  | _ -> failwith "Not correct closure form"
 
 
@@ -108,53 +171,47 @@ let to_string_id_imm (x:id_or_imm) : string =
  | Var x -> Id.to_string x
  | Const i -> string_of_int i
 
-let rec to_string_exp (e:expr) = 
+let rec to_string_exp ?(p: string = "") (e:expr) = 
+  let string_if(v1: string) (v2: string) (a1: asmt) (a2: asmt) (op: string): string =
+    let sa1 = to_string_asmt (p^"  ") a1 and sa2 = to_string_asmt (p^"  ") a2 in
+    sprintf "if %s %s %s then\n%s\n%selse\n%s\n" v1 op v2 sa1 p sa2
+  in
   match e with
-  | NOP -> "nop"
-  | VAL v -> to_string_id_imm v
-  | LABEL l -> Id.to_string l
-  | NEG v -> sprintf "(neg %s)" (Id.to_string v)
-  | ADD (v1,v2) -> sprintf "(add %s %s)" (Id.to_string v1) (to_string_id_imm v2)
-  | SUB (v1,v2) -> sprintf "(sub %s %s)" (Id.to_string v1) (to_string_id_imm v2)
+  | NOP -> sprintf "nop"
+  | VAL v -> sprintf "%s" (to_string_id_imm v)
+  | LABEL l -> sprintf "%s" (Id.to_string l)
+  | NEG v -> sprintf "neg %s" (Id.to_string v)
+  | ADD (v1,v2) -> sprintf "%sadd %s %s" p (Id.to_string v1) (to_string_id_imm v2)
+  | SUB (v1,v2) -> sprintf "%ssub %s %s" p (Id.to_string v1) (to_string_id_imm v2)
   | FNEG v -> sprintf "(fneg %s)" (Id.to_string v)
   | FADD (v1,v2) -> sprintf "(fadd %s %s)" (Id.to_string v1) (Id.to_string v2)
   | FSUB (v1,v2) -> sprintf "(fsub %s %s)" (Id.to_string v1) (Id.to_string v2)
   | FMUL (v1,v2) -> sprintf "(fmul %s %s)" (Id.to_string v1) (Id.to_string v2)
   | FDIV (v1,v2) -> sprintf "(fdiv %s %s)" (Id.to_string v1) (Id.to_string v2)
-  | NEW v -> sprintf "(new %s)" (to_string_id_imm v)
+  | NEW v -> sprintf "new %s" (to_string_id_imm v)
   | MEMGET (v1,v2) -> sprintf "mem(%s + %s)" (Id.to_string v1) (to_string_id_imm v2)
-  | MEMASSIGN (v1,v2,v3) -> sprintf "(mem(%s + %s) <- %s)" v1 (to_string_id_imm v2) v3
-  | IFEQ ((v, vd), a1, a2) ->
-    let sa1 = to_string_asmt a1 and sa2 = to_string_asmt a2 in
-      sprintf "(if %s = %s then\n%s\nelse\n%s)" (Id.to_string v) (to_string_id_imm vd) sa1 sa2
-  | IFLE ((v, vd), a1, a2) ->
-    let sa1 = to_string_asmt a1 and sa2 = to_string_asmt a2 in
-      sprintf "(if %s <= %s then\n%s\nelse\n%s)" (Id.to_string v) (to_string_id_imm vd) sa1 sa2
-  | IFGE ((v, vd), a1, a2) ->
-    let sa1 = to_string_asmt a1 and sa2 = to_string_asmt a2 in
-      sprintf "(if %s >= %s then\n%s\nelse\n%s)" (Id.to_string v) (to_string_id_imm vd) sa1 sa2
-  | IFFEQUAL ((v, v2), a1, a2) ->
-    let sa1 = to_string_asmt a1 and sa2 = to_string_asmt a2 in
-      sprintf "(if %s =. %s then\n%s\nelse\n%s)" (Id.to_string v) (Id.to_string v2) sa1 sa2
-  | IFFLE ((v, v2), a1, a2) ->
-    let sa1 = to_string_asmt a1 and sa2 = to_string_asmt a2 in
-      sprintf "(if %s <=. %s then\n%s\nelse\n%s)" (Id.to_string v) (Id.to_string v2) sa1 sa2
-  | CALL (label,args) -> sprintf "call %s %s" 
+  | MEMASSIGN (v1,v2,v3) -> sprintf "mem(%s + %s) <- %s" v1 (to_string_id_imm v2) v3
+  | IFEQ ((v, vd), a1, a2) -> string_if v (to_string_id_imm vd) a1 a2 "="
+  | IFLE ((v, vd), a1, a2) -> string_if v (to_string_id_imm vd) a1 a2 "<="
+  | IFGE ((v, vd), a1, a2) -> string_if v (to_string_id_imm vd) a1 a2 ">="
+  | IFFEQUAL ((v, v2), a1, a2) -> string_if v v2 a1 a2 "=."
+  | IFFLE ((v, v2), a1, a2) -> string_if v v2 a1 a2 "<=."
+  | CALL (label,args) -> sprintf "call %s %s"
     (Id.to_string label) (Syntax.infix_to_string Id.to_string args " ")
-  | CALLCLO (label,args) -> "apply_closure"
+  | CALLCLO (label,args) -> sprintf "call_closure %s %s" label (Syntax.infix_to_string Id.to_string args " ")
 
-and to_string_asmt (a:asmt) : string =
+and to_string_asmt (p: string) (a:asmt) : string =
   match a with
   | LET (v, e, a) -> 
-    sprintf "(let %s = %s in\n%s)" (Id.to_string v) (to_string_exp e) (to_string_asmt a)
-  | EXP e -> to_string_exp e
+    sprintf "%slet %s = %s in\n%s" p (Id.to_string v) (to_string_exp e) (to_string_asmt p a)
+  | EXP e -> p ^ (to_string_exp ~p:p e)
 
 let rec to_string_letdef (l:letdef) : string =
   match l with
-  | Main asmt -> sprintf "let _ = \n%s" (to_string_asmt asmt)
+  | Main asmt -> sprintf "let _ = \n%s" (to_string_asmt "  " asmt)
   | LetFloat f -> Float.to_string f
-  | LetLabel (l, args, asmt) -> sprintf("let %s %s =\n%s\n") l (Syntax.infix_to_string Id.to_string args " ") (to_string_asmt asmt)
-  
+  | LetLabel (l, args, asmt) -> sprintf "let %s %s =\n%s\n" l (Syntax.infix_to_string Id.to_string args " ") (to_string_asmt "  " asmt)
+
 let to_string (a:asml) : string =
   List.fold_left (fun acc s -> acc ^ "\n" ^ (to_string_letdef s)) "" a
 
