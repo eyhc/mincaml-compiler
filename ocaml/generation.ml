@@ -58,9 +58,11 @@ let rec count_lets_in_reg_function : reg_function -> int =
         Printf.sprintf "\tcmp %s, %s" r1 r2 ::
         Printf.sprintf "\tb%s %s" cmp_type true_label ::
         List.concat (List.map generate_asm_regt false_branch) @
+        Printf.sprintf "\tmov %s, r0" s ::
         Printf.sprintf "\tb %s" end_label ::
         Printf.sprintf "\t%s:" true_label ::
         List.concat (List.map generate_asm_regt true_branch) @
+        Printf.sprintf "\tmov %s, r0" s ::
         Printf.sprintf "\t%s:" end_label :: []
       | Call (func_name) -> [Printf.sprintf "\tbl %s" func_name; Printf.sprintf "\tmov %s, r0" s]
       | Neg s1 -> [Printf.sprintf "\tneg %s, %s" s s1]
@@ -84,7 +86,26 @@ let rec count_lets_in_reg_function : reg_function -> int =
       else
         [Printf.sprintf "\tldr r0, =#%d" n]      
     | Reg reg -> [Printf.sprintf "\tmov r0, %s" reg]
+    | Add (s1, expr) ->
+      (match expr with
+      | Int n -> 
+        if n <= 255 then
+          [Printf.sprintf "\tadd r0, %s, #%d" s1 n]
+        else
+          [Printf.sprintf "\tldr r0, =#%d" n; Printf.sprintf "\tadd r0, %s, r0" s1]
+      | Reg reg -> [Printf.sprintf "\tadd r0, %s, %s" s1 reg]
+      | _ -> assert false)
+    | Sub (s1, expr) ->
+      (match expr with
+      | Int n -> 
+        if n <= 255 then
+          [Printf.sprintf "\tsub r0, %s, #%d" s1 n]
+        else
+          [Printf.sprintf "\tldr r0, =#%d" n; Printf.sprintf "\tsub r0, %s, r0" s1]
+      | Reg reg -> [Printf.sprintf "\tsub r0, %s, %s" s1 reg]
+      | _ -> assert false)
     | Call (func_name) -> [Printf.sprintf "\tbl %s" func_name;]
+    | Neg s1 -> [Printf.sprintf "\tneg r0, %s" s1]
     | Unit -> []
     | _ -> assert false)
   | Store (Reg reg, mem) -> [Printf.sprintf "\tstr %s, %s" reg mem]
