@@ -1,6 +1,6 @@
 (*
 elim.ml
-Elimination of unnecessary definition
+Elimination of unnecessary definitions
 
 date : 09-01-2023
 *)
@@ -64,7 +64,7 @@ let elim_definition (ast:Knorm.knorm_t) : Knorm.knorm_t =
     | IfLE ((x,y),e1,e2) -> 
       let _ = env_incr env x in 
         let _ = env_incr env y in 
-          IfEq ((x,y), elim e1 env, elim e2 env)
+          IfLE ((x,y), elim e1 env, elim e2 env)
   
     (* Main cases *)
     | Let ((s,t), e1, e2) -> 
