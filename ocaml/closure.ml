@@ -64,7 +64,7 @@ let rec to_string ?(p: string = "") exp: string =
   - var -> le nom de la fonction
   Retourne: un label
 *)
-let genlabel (var: Id.t): Id.t = "fun_"^var
+let genlabel (var: Id.t): Id.t = "_"^var
 
 (* 
   Cherche la liste des variables dans une expression

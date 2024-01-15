@@ -79,7 +79,7 @@ let rec generation_expr (a:Closure.t) : expr =
     IFEQ((x, Var y), generation_asmt at1, generation_asmt at2)
   | IfLE (x, y, at1, at2) ->
     IFLE((x, Var y), generation_asmt at1, generation_asmt at2)
-  | ApplyDir(f, vars) -> if Typechecker.is_prefef_fun f then call_predef f vars else failwith "todo"
+  | ApplyDir(f, vars) -> if Typechecker.is_prefef_fun f then call_predef f vars else CALL(f, vars)
 
   (* | MakeClosure (f, ys) -> failwith "todo" *)
   | _ -> assert false
@@ -153,8 +153,8 @@ let rec to_string_letdef (l:letdef) : string =
   match l with
   | Main asmt -> sprintf "let _ = \n%s" (to_string_asmt asmt)
   | LetFloat f -> Float.to_string f
-  | LetLabel (l, args, asmt) -> failwith "todo"
-
+  | LetLabel (l, args, asmt) -> sprintf("let %s %s =\n%s\n") l (Syntax.infix_to_string Id.to_string args " ") (to_string_asmt asmt)
+  
 let to_string (a:asml) : string =
   List.fold_left (fun acc s -> acc ^ "\n" ^ (to_string_letdef s)) "" a
 
