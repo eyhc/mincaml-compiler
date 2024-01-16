@@ -26,6 +26,8 @@ rm tests/gen-code/*.actual 2> /dev/null 1> /dev/null
 passed=0
 failed=0
 
+num_test=0
+
 # run one test case for each iteration in gen-code and make sure the asml code generated is correct and give the expected result
 echo "---------- TESTING FRONT-END PASSES TO ASML GENERATION ----------"
 for test_case in $test_files
@@ -54,7 +56,7 @@ do
     fi
     
     old_topic_num=$topic_num; 
-    num_test=$(($num_test++))
+    num_test=$(($num_test+1))
 done
 
 rm -f ${tests_abs}*actual ${tests_abs}*${generate}
