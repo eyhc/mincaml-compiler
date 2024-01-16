@@ -159,7 +159,6 @@ let print_asml f =
     Typechecker.type_check ast;              (* Typechecking *)
     let ast = Knorm.normalize ast in         (* K-normalization *)
     let ast = Alpha.conversion ast in        (* Alpha-conversion *)
-    let ast = iter_optim ast in              (* Optimisations *)
     let ast = Reduction.reduction ast in     (* Reduction of nested-let *)
     let ast = Closure.closure ast in         (* Closure conversion *)
     let asml = Asml.generation ast in        (* ASML generation *)

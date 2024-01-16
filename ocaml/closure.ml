@@ -9,12 +9,20 @@ type t =
   | Neg of Id.t
   | Add of Id.t * Id.t
   | Sub of Id.t * Id.t
+  (* Tuples *)
+  | Tuple of Id.t list
+  (* Arrays *)
+  | Array of Id.t * Id.t
+  | Get of Id.t * Id.t
+  | Put of Id.t * Id.t * Id.t
   (* If égal: opérande gauche * opérande droite * then * else  *)
   | IfEq of Id.t * Id.t * t * t
   (* If inférieur ou égal: opérande gauche * opérande droite * then * else  *)
   | IfLE of Id.t * Id.t * t * t
   (* Déclaration d'une variable: (id, type) * valeur * in *)
   | Let of (Id.t * Type.t) * t * t
+  (* Lecture d'un tuple : liste des variables recevant les éléments du tuple * le nom de la variable contenant le tuple * in *)
+  | LetTuple of (Id.t * Type.t) list * Id.t * t
   (* Création d'une closure: (id * type)  * label de la fonction * variables libres * next (équivalent à un let) *)
   | MakeCls of (Id.t * Type.t) * Id.t * Id.t list * t
   (* Appel à une fonction via apply_direct: label de la fonction * arguments *)
@@ -45,9 +53,14 @@ let rec to_string ?(p: string = "") exp: string =
   | Neg x -> Id.to_string x
   | Add(a, b) -> sprintf("%s%s + %s") p a b
   | Sub(a, b) -> sprintf("%s%s - %s") p a b
+  | Tuple(vars) -> sprintf("(%s)") (Syntax.infix_to_string Id.to_string vars ", ")
+  | Array(a, b) -> sprintf("Array.create %s %s") a b
+  | Get(a, b) -> sprintf("%s.(%s)") a b
+  | Put(a, b , c) -> sprintf("%s.(%s) <- %s") a b c
   | IfEq(a, b, th, els) -> sprintf("%sif %s = %s then\n%s\n%selse\n%s") p a b (to_string ~p:(p^tab) th) p (to_string ~p:(p^tab) els)
   | IfLE(a, b, th, els) -> sprintf("%sif %s <= %s then\n%s\n%selse\n%s") p a b (to_string ~p:(p^tab) th) p (to_string ~p:(p^tab) els)
   | Let((id, t), value, next) -> sprintf("%slet %s = %s in\n%s") p id (to_string value) (to_string ~p:p next)
+  | LetTuple(vars, tuple, next) -> sprintf("%slet %s = %s in\n%s") p (Syntax.infix_to_string (fun (x, y) -> Id.to_string x) vars ", ") tuple (to_string ~p:p next)
   | MakeCls((id, t), label, args, next) -> sprintf("%slet %s = make_closure(%s) in\n%s") p 
   id (Syntax.infix_to_string Id.to_string (label :: args) ", ") (to_string ~p:p next)
   | ApplyDir(label, args) -> sprintf("%sapply_direct(%s)") p (Syntax.infix_to_string Id.to_string (label :: args) ", ")
@@ -81,24 +94,29 @@ let rec fun_free_vars (env: VarSet.t) (parent: Id.t * VarSet.t) (exp: Knorm.knor
   in
   match exp with
   | Var(id) when List.exists (fun (x, y) -> x = id) (VarSet.elements env) -> VarSet.singleton (find_id_type id)
-  | Add(a, b) | Sub(a, b) ->
-    let set = VarSet.singleton (find_id_type a) in
-    VarSet.add (find_id_type b) set
+  | Add(a, b) | Sub(a, b) | Array(a, b) | Get(a, b) ->
+      let set = VarSet.singleton (find_id_type a) in
+      VarSet.add (find_id_type b) set
+  | Tuple(vars) -> VarSet.of_list (List.map (fun x -> find_id_type x) vars)
+  | Put(a, b, c)  -> VarSet.of_list (List.map find_id_type [a; b; c])
   | IfEq((a, b), th, els) | IfLE((a, b), th, els) ->
-    let a' = find_id_type a in
-    let b' = find_id_type b in
-    let env' = VarSet.add a' (VarSet.add b' env) in
-    let set = VarSet.add a' (VarSet.add b' (fun_free_vars env' parent th)) in
-    VarSet.union set (fun_free_vars env' parent els)
+      let a' = find_id_type a in
+      let b' = find_id_type b in
+      let env' = VarSet.add a' (VarSet.add b' env) in
+      let set = VarSet.add a' (VarSet.add b' (fun_free_vars env' parent th)) in
+     VarSet.union set (fun_free_vars env' parent els)
   | Let((id, t), value, next) -> 
-    let env' = VarSet.add (id, t) env in
-    VarSet.union (fun_free_vars env' parent value) (VarSet.remove (id, t) (fun_free_vars env' parent next))
+      let env' = VarSet.add (id, t) env in
+      VarSet.union (fun_free_vars env' parent value) (VarSet.remove (id, t) (fun_free_vars env' parent next))
   | LetRec(fd, next) -> 
-    let env' = VarSet.union (VarSet.of_list fd.args) env in
-    let set = VarSet.union (fun_free_vars env' parent fd.body) (fun_free_vars env parent next) in
-    VarSet.diff set (VarSet.of_list fd.args)
+      let env' = VarSet.union (VarSet.of_list fd.args) env in
+      let set = VarSet.union (fun_free_vars env' parent fd.body) (fun_free_vars env parent next) in
+      VarSet.diff set (VarSet.of_list fd.args)
+  | LetTuple(vars, tuple, next) -> 
+      let env' = VarSet.union (VarSet.of_list vars) env in
+      VarSet.diff (VarSet.add (find_id_type tuple) (fun_free_vars env' parent next)) (VarSet.of_list vars)
   | App(name, args) when List.exists (fun (x,y) -> x = name) (VarSet.elements env) -> VarSet.add (find_id_type name) (VarSet.union (VarSet.of_list (List.map (fun x -> find_id_type x) args))
-    (if name == fst parent then snd parent else VarSet.empty))
+      (if name == fst parent then snd parent else VarSet.empty))
   | App(name, args) -> VarSet.union (VarSet.of_list (List.map (fun x -> find_id_type x) args))
       (if name == fst parent then snd parent else VarSet.empty)
   | _ -> VarSet.empty
@@ -142,6 +160,12 @@ let convert (exp: Knorm.knorm_t): fundef list * t =
     | Neg x -> Neg(x)
     | Add(a, b) -> Add(rename a, rename b)
     | Sub(a, b) -> Sub(rename a, rename b)
+    | Tuple(vars) -> 
+        let id = Id.genid () in
+        Let((id, Type.Unit), Tuple(List.map rename vars), Var(id))
+    | Array(a, b) -> Array(rename a, rename b)
+    | Get(a, b) -> Get(rename a, rename b)
+    | Put(a, b, c) -> Put(rename a, rename b, rename c)
     | IfEq((a, b), th, els) -> 
         IfEq(a, b, worker env th, worker env els)
     | IfLE((a, b), th, els) -> 
@@ -159,6 +183,9 @@ let convert (exp: Knorm.knorm_t): fundef list * t =
     | Let((id, t), value, next) -> 
         let env' = VarSet.add (id, t) env in
         Let((id, t), worker env value, worker env' next)
+    | Let((id, t), Tuple(vars), next) ->
+        let env' = VarSet.add (id, t) env in
+        Let((id, t), Tuple(List.map rename vars), worker env' next)
     | LetRec(fd, next) ->
       (* Ajout des paramètres de la fonction à l'environnement *)
       let env' = VarSet.union (VarSet.of_list fd.args) env in
@@ -173,6 +200,9 @@ let convert (exp: Knorm.knorm_t): fundef list * t =
       funs := {label= (label, (snd fd.name)); args= fd.args; frees= VarSet.elements frees; code= body'} :: !funs;
       (* Conversion du code après la définition de la fonction *)
       worker env next
+    | LetTuple(vars, tuple, next) -> 
+      let env' = VarSet.union (VarSet.of_list vars) env in
+      LetTuple(vars, tuple, worker env' next)
     (* Appel d'une fonction *)
     | App(name, args) when List.exists (fun x -> (fst x.label) = (genlabel name)) !funs ->
         let f = List.find (fun x -> (fst x.label) = (genlabel name)) !funs in

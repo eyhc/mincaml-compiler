@@ -54,7 +54,7 @@ let call_predef (f:Id.l) (vars:Id.t list) : expr =
   match f with
   | "print_int" -> CALL ("_min_caml_print_int", vars)
   | "print_float" -> CALL ("_min_caml_print_float", vars)
-  | "print_newline" -> CALL ("_min_caml_print_newline", vars)
+  | "print_newline" -> CALL ("_min_caml_print_newline", ["()"])
   | "sin" -> CALL ("_min_caml_sin", vars)
   | "cos" -> CALL ("_min_caml_cos", vars)
   | "sqrt" -> CALL ("_min_caml_sqrt", vars)
@@ -139,6 +139,16 @@ let rec generation_let_with_apply (id: Id.t) (f: Id.t) (args: Id.t list) (next: 
       CALL(f, args))
     , generation_asmt next)
 
+and generation_tuple (id: Id.t) (vars: Id.t list) (e1: Closure.t): asmt =
+  let size = List.length vars in
+  let rec gen (p: Id.t) (n: int) (vs: Id.t list) (next: asmt): asmt =
+    match vs with
+    | [x] -> LET(Id.genid (), MEMASSIGN(id, Const(n), x), next)
+    | x :: tail -> LET(Id.genid (), MEMASSIGN(id, Const(n), x), gen p (n+4) tail next)
+    | _ -> assert false
+  in
+  LET(id, NEW(Const(size * 4)), gen id 0 vars (generation_asmt e1))
+
 and generation_expr (a:Closure.t) : expr =
   match a with
   | Unit -> NOP
@@ -155,16 +165,27 @@ and generation_expr (a:Closure.t) : expr =
     IFLE((x, Var y), generation_asmt at1, generation_asmt at2)
   | ApplyDir(f, vars) -> if Typechecker.is_prefef_fun f then call_predef f vars else CALL(f, vars)
   | ApplyCls(l, vars) -> CALLCLO(l, vars)
-  | _ -> assert false
+  | _ -> printf("%s\n\n") (Closure.to_string a); assert false
 
 and generation_asmt (a:Closure.t) : asmt = 
- match a with
- | MakeCls((x, t), l, args, e1) -> 
-    let f = get_fdef l in
-    make_closure x (fst f.label) (List.map fst f.frees) (generation_asmt e1)
- | Let((x, t), ApplyDir(f, args), e1) -> generation_let_with_apply x f args e1
- | Let ((x, t), e1, e2) -> LET(x, generation_expr e1, generation_asmt e2)
- | _ -> EXP (generation_expr a)
+  match a with
+  | Let((x, t), Array(a, b), e1) -> LET(x, CALL("_min_caml_create_array", [a; b]), generation_asmt e1)
+  | Let((x, t), Get(a, b), e1) -> LET(x, MEMGET(a, Var(b)), generation_asmt e1)
+  | Let((x, t), Put(a, b, c), e1) -> LET(x, MEMASSIGN(a, Var(b), c), generation_asmt e1)
+  | Let((x, t), Tuple(vars), e1) -> generation_tuple x vars e1
+  | Let((x, t), ApplyDir(f, args), e1) -> generation_let_with_apply x f args e1
+  | Let ((x, t), e1, e2) -> LET(x, generation_expr e1, generation_asmt e2)
+  | LetTuple(vars, tuple, e1) -> 
+      let rec gen (n: int) (vs: (Id.t * Type.t) list): asmt =
+        match vs with
+        | [(x, y)] -> LET(x, MEMGET(tuple, Const(n)), (generation_asmt e1))
+        | (x, y) :: tail -> LET(x, MEMGET(tuple, Const(n)), gen (n+4) tail)
+        | _ -> assert false
+      in gen 0 vars
+  | MakeCls((x, t), l, args, e1) -> 
+      let f = get_fdef l in
+      make_closure x (fst f.label) (List.map fst f.frees) (generation_asmt e1)
+  | _ -> EXP (generation_expr a)
 
 let rec generation_letdef (a:Closure.fundef) : letdef =
   let rec add_load_frees (n: int) (frees: Id.t list) (code: asmt) : asmt =
