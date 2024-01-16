@@ -19,8 +19,7 @@ let rec env_get (env:environment) (v:Id.t) : int =
   | (x,i)::l ->
     if x = v then !i else env_get l v
 
-
-
+(* Main function *)
 let elim_definition (ast:Knorm.knorm_t) : Knorm.knorm_t =
   let rec elim (a:Knorm.knorm_t) (env:environment) : Knorm.knorm_t =
     match a with
@@ -65,12 +64,15 @@ let elim_definition (ast:Knorm.knorm_t) : Knorm.knorm_t =
       let _ = env_incr env x in 
         let _ = env_incr env y in 
           IfLE ((x,y), elim e1 env, elim e2 env)
-  
+
     (* Main cases *)
     | Let ((s,t), e1, e2) -> 
-      let env' = (s, ref 0)::env in
-        let e1' = elim e1 env and e2' = elim e2 env' in
-          if (env_get env' s) <> 0 then Let((s,t), e1', e2') else e2'
+      (match e1 with 
+      | Put _ -> a (* here there is side effect *)
+      | _ ->
+        let env' = (s, ref 0)::env in
+          let e1' = elim e1 env and e2' = elim e2 env' in
+            if (env_get env' s) <> 0 then Let((s,t), e1', e2') else e2')
 
     | LetRec (fd, e) -> 
       let env' = (fst fd.name, ref 0)::env in

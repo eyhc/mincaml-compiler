@@ -63,5 +63,5 @@ let rec constant_folding (env:exp_map) (expr: Knorm.knorm_t) : Knorm.knorm_t =
     | _ -> LetTuple(l1, v, constant_folding env e1))
   | _ -> expr
 
-let constant (knorm_ast:Knorm.knorm_t) : Knorm.knorm_t =  
+let folding (knorm_ast:Knorm.knorm_t) : Knorm.knorm_t =  
   constant_folding [] knorm_ast
