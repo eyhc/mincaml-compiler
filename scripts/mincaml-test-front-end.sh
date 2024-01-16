@@ -11,7 +11,8 @@ generate=.asml
 topics=("" "arithmetic operations" "call to external functions"
     "if_then_else" "functions" "arrays and tuples" 
     "closure" "floats" )
-n_test=`ls "$tests"*.ml | wc -l`
+
+test_files=`ls "$tests"*.ml | grep -v back`
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -27,9 +28,8 @@ failed=0
 
 # run one test case for each iteration in gen-code and make sure the asml code generated is correct and give the expected result
 echo "---------- TESTING FRONT-END PASSES TO ASML GENERATION ----------"
-for test_case in `ls "$tests"*.ml | grep -v back`
+for test_case in $test_files
 do
-    
     file=$(basename $test_case)
     topic_num=$(echo $file | cut -d'-' -f1)
     file_name=$(echo $file | cut -d'-' -f2)
@@ -49,18 +49,20 @@ do
             echo -e "\r${GREEN} OK${RESET}"
             passed=$((passed+1))
         else
-            echo -e "${RED}KO${RESET}"
+            echo -e "\r ${RED} KO${RESET}"
             failed=$((failed+1))
     fi
+    
     old_topic_num=$topic_num; 
+    num_test=$(($num_test++))
 done
 
 rm -f ${tests_abs}*actual ${tests_abs}*${generate}
 
 echo "Front-end : génération de l'ASML" >> resultats_tests.txt
-echo "Passed tests : $passed/$n_test"
-echo "Failed tests : $failed/$n_test"
+echo "Passed tests : $passed/$num_test"
+echo "Failed tests : $failed/$num_test"
 echo "----------------------------------------------------------------"
 
-echo "Passed tests : $passed/$n_test" >> resultats_tests.txt
-echo "Failed tests : $failed/$n_test" >> resultats_tests.txt
+echo "Passed tests : $passed/$num_test" >> resultats_tests.txt
+echo "Failed tests : $failed/$num_test" >> resultats_tests.txt
