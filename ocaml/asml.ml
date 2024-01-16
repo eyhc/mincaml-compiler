@@ -70,8 +70,11 @@ let funsdef: Closure.fundef list ref = ref [];;
 let get_fdef (name: Id.t): Closure.fundef =
   List.find (fun (x: Closure.fundef) -> fst x.label = name) !funsdef
 
+let is_fun (name: Id.t): bool =
+  List.exists (fun (x: Closure.fundef) -> (fst x.label) = name) ! funsdef
+
 let is_freefun (name: Id.t): bool =
-  if List.exists (fun (x: Closure.fundef) -> (fst x.label) = name) !funsdef then
+  if is_fun name then
     let f = List.find (fun (x: Closure.fundef) -> (fst x.label) = name) !funsdef in
     List.length f.frees > 0
   else
@@ -110,6 +113,24 @@ let rec generation_let_with_apply (id: Id.t) (f: Id.t) (args: Id.t list) (next: 
     let call = CALL(f, List.map (fun x -> if List.exists (fun y -> (fst y) = x) args_ids then snd (List.find (fun y -> (fst y) = x) args_ids) else x) args) in
     let call = LET(id, call, generation_asmt next) in
     funs_as_params freefuns_args call
+  (* Le call contient des fonctions en paramètres mais qui n'ont pas de variables libres *)
+  else if List.exists is_fun args then
+    let rec make_closure_for_args (args: (Id.t * Id.t) list) (next: asmt): asmt =
+      match args with
+      | [(x, y)] -> make_closure y x [] next
+      | (x, y) :: tail -> make_closure y x [] (make_closure_for_args tail next)
+      | _ -> assert false
+    in
+    let new_args = List.map (fun x -> (x, Id.genid ())) args in
+    let renamed_args = List.map (fun x -> if is_fun x then snd (List.find (fun (y, z) -> x = y) new_args) else x) args in
+    let call = LET(id, 
+      (if Typechecker.is_prefef_fun f then
+        call_predef f renamed_args
+      else
+        CALL(f, renamed_args))
+      , generation_asmt next)
+    in
+    make_closure_for_args new_args call
   else
     LET(id, 
     (if Typechecker.is_prefef_fun f then
