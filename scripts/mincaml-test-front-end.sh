@@ -11,7 +11,8 @@ generate=.asml
 topics=("" "arithmetic operations" "call to external functions"
     "if_then_else" "functions" "arrays and tuples" 
     "closure" "floats" )
-n_test=`ls "$tests"*.ml | wc -l`
+
+test_files=`ls "$tests"*.ml | grep -v back`
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -25,9 +26,11 @@ rm tests/gen-code/*.actual 2> /dev/null 1> /dev/null
 passed=0
 failed=0
 
+num_test=0
+
 # run one test case for each iteration in gen-code and make sure the asml code generated is correct and give the expected result
 echo "---------- TESTING FRONT-END PASSES TO ASML GENERATION ----------"
-for test_case in `ls "$tests"*.ml`
+for test_case in $test_files
 do
     file=$(basename $test_case)
     topic_num=$(echo $file | cut -d'-' -f1)
@@ -35,27 +38,33 @@ do
     file_generated="${tests_abs}""$(echo $file_name | cut -d'.' -f1)""${generate}"
     result="${tests_abs}"$(echo $file_name | cut -d'.' -f1)".actual"
     expected="${tests_abs}"$(echo $file_name | cut -d'.' -f1)".expected"
-
+    
     (( topic_num != old_topic_num )) &&  echo && echo -e "\t - Iteration $topic_num : ${topics[topic_num]} - "
     
-    echo -n "    Test on: $file_name ..."
-    echo "Nothing to print" > $result
-    echo $($MINCAMLC $OPTION "$test_case") 2> $file_generated 1> $file_generated
-    echo $($EXEC "$file_generated") 2> $result 1> $result
+    echo -n "    Test on: "$file_name" ..."
+    echo "Nothing to print" > "$result"
+    echo $($MINCAMLC $OPTION "$test_case") 2> "$file_generated" 1> "$file_generated"
+    echo $($EXEC "$file_generated") 2> "$result" 1> "$result"
     echo $(diff -s "$result" "$expected") 1> /dev/null
     if diff "$result" "$expected" 2> /dev/null 
         then 
             echo -e "\r${GREEN} OK${RESET}"
             passed=$((passed+1))
         else
-            echo -e "${RED}KO${RESET}"
+            echo -e "\r ${RED} KO${RESET}"
             failed=$((failed+1))
     fi
+    
     old_topic_num=$topic_num; 
+    num_test=$(($num_test+1))
 done
 
 rm -f ${tests_abs}*actual ${tests_abs}*${generate}
 
-echo 
-echo "Passed tests : $passed/$n_test"
-echo "Failed tests : $failed/$n_test"
+echo "Front-end : génération de l'ASML" >> resultats_tests.txt
+echo "Passed tests : $passed/$num_test"
+echo "Failed tests : $failed/$num_test"
+echo "----------------------------------------------------------------"
+
+echo "Passed tests : $passed/$num_test" >> resultats_tests.txt
+echo "Failed tests : $failed/$num_test" >> resultats_tests.txt

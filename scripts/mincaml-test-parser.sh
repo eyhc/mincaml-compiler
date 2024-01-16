@@ -7,6 +7,10 @@ cd "$(dirname "$0")"/.. || exit 1
 MINCAMLC=ocaml/mincamlc
 OPTION=-p
 
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+RESET='\033[0m'
+
 # variables to count the number of passed and failed tests
 passed=0
 failed=0
@@ -17,35 +21,42 @@ failed=0
 echo "---------- TESTING PARSER ----------"
 for test_case in tests/syntax/valid/*.ml
 do
-    echo "testing parser on: $test_case"
+    file=$(basename $test_case)
+    file_name=$(echo $file | cut -d'-' -f2)
+
+    echo -n "    Test on: "$file_name" ..."
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
-    then
-        echo "OK"
+    then 
+        echo -e "\r${GREEN} OK${RESET}"
         passed=$((passed+1))
-    else 
-        echo "KO"
+    else
+        echo -e "\r${RED} KO${RESET}"
         failed=$((failed+1))
     fi
 done
 
 for test_case in tests/syntax/invalid/*.ml
 do
-    echo "testing parser on: $test_case"
+    file=$(basename $test_case)
+    file_name=$(echo $file | cut -d'-' -f2)
+
+    echo -n "    Test on: "$file_name" ..."
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
-        echo "OK"
+        echo -e "\r${RED} OK${RESET}"
         failed=$((failed+1))
     else 
-        echo "KO"
+        echo -e "\r${GREEN} KO${RESET}"
         passed=$((passed+1))
     fi
 done
 
-echo "\n---------- END TESTING ----------"
+echo "---------- END TESTING ----------"
 echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they return KO)"
 echo "Tests failed : $failed / $((passed + failed))"
-echo "-----------------------------------\n"
+echo "-----------------------------------"
 echo "RESUME DES TESTS" > resultats_tests.txt
 echo "Parser" >> resultats_tests.txt
 echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they return KO)" >> resultats_tests.txt
-echo "Tests failed : $failed / $((passed + failed))\n" >> resultats_tests.txt
+echo -e "Tests failed : $failed / $((passed + failed))\n" >> resultats_tests.txt
+echo 
