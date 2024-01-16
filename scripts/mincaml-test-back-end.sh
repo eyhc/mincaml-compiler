@@ -39,11 +39,11 @@ do
 
     (( topic_num != old_topic_num )) &&  echo && echo -e "\t Iteration $topic_num : ${topics[topic_num]}"
     
-    echo -n "    Test on: $file_name ..."
-    echo "Nothing to print" > $result
-    echo $($MINCAMLC $OPTION "$test_case") 2> $file_generated 1> $file_generated
+    echo -n "    Test on: "$file_name" ..."
+    echo "Nothing to print" > "$result"
+    echo $($MINCAMLC $OPTION "$test_case") 2> "$file_generated" 1> "$file_generated"
     echo $($COMPILE $file_generated) > "${file_name}"".comp"
-    echo $($EXEC "${file_name}"".comp") 2> $result 1> $result
+    echo $($EXEC "${file_name}"".comp") 2> "$result" 1> "$result"
     echo $(diff -s "$result" "$expected") 1> /dev/null
     if diff "$result" "$expected" 2> /dev/null 
         then 

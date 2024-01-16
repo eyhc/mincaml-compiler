@@ -29,19 +29,20 @@ failed=0
 echo "---------- TESTING FRONT-END PASSES TO ASML GENERATION ----------"
 for test_case in `ls "$tests"*.ml | grep -v back`
 do
+    
     file=$(basename $test_case)
     topic_num=$(echo $file | cut -d'-' -f1)
     file_name=$(echo $file | cut -d'-' -f2)
     file_generated="${tests_abs}""$(echo $file_name | cut -d'.' -f1)""${generate}"
     result="${tests_abs}"$(echo $file_name | cut -d'.' -f1)".actual"
     expected="${tests_abs}"$(echo $file_name | cut -d'.' -f1)".expected"
-
+    
     (( topic_num != old_topic_num )) &&  echo && echo -e "\t - Iteration $topic_num : ${topics[topic_num]} - "
     
-    echo -n "    Test on: $file_name ..."
-    echo "Nothing to print" > $result
-    echo $($MINCAMLC $OPTION "$test_case") 2> $file_generated 1> $file_generated
-    echo $($EXEC "$file_generated") 2> $result 1> $result
+    echo -n "    Test on: "$file_name" ..."
+    echo "Nothing to print" > "$result"
+    echo $($MINCAMLC $OPTION "$test_case") 2> "$file_generated" 1> "$file_generated"
+    echo $($EXEC "$file_generated") 2> "$result" 1> "$result"
     echo $(diff -s "$result" "$expected") 1> /dev/null
     if diff "$result" "$expected" 2> /dev/null 
         then 
