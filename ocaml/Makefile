@@ -15,4 +15,5 @@ test: all
 	@./../scripts/mincaml-test-parser.sh
 	@./../scripts/mincaml-test-typechecking.sh
 	@bash ../scripts/mincaml-test-front-end.sh
+	@bash ../scripts/mincaml-test-back-end.sh
 	@cat ../resultats_tests.txt
