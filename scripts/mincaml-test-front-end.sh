@@ -27,7 +27,7 @@ failed=0
 
 # run one test case for each iteration in gen-code and make sure the asml code generated is correct and give the expected result
 echo "---------- TESTING FRONT-END PASSES TO ASML GENERATION ----------"
-for test_case in `ls "$tests"*.ml`
+for test_case in `ls "$tests"*.ml | grep -v back`
 do
     file=$(basename $test_case)
     topic_num=$(echo $file | cut -d'-' -f1)
@@ -56,6 +56,10 @@ done
 
 rm -f ${tests_abs}*actual ${tests_abs}*${generate}
 
-echo 
+echo "Front-end : génération de l'ASML" >> resultats_tests.txt
 echo "Passed tests : $passed/$n_test"
 echo "Failed tests : $failed/$n_test"
+echo "----------------------------------------------------------------"
+
+echo "Passed tests : $passed/$n_test" >> resultats_tests.txt
+echo "Failed tests : $failed/$n_test" >> resultats_tests.txt
