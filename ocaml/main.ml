@@ -19,7 +19,7 @@ and back_print = ref false
 
 
 (* -n_iter *)
-let n_iter_optim = ref 100
+let n_iter_optim = ref 500
 
 let usage_msg = Printf.sprintf "Usage: %s [options]" (Array.get Sys.argv 0)
 
@@ -38,7 +38,7 @@ let speclist = [
   ("-let", Arg.Unit(fun () -> let_reduc :=true), "Reduction of nested let-expression");
   ("-closure", Arg.Unit(fun () -> closure :=true), "Closure conversion");
   ("-optim", Arg.Unit(fun () -> optim :=true), "test optimisation");
-  ("-back", Arg.Unit(fun () -> back_print :=true), "Back code intermediaire");
+  ("-back", Arg.Unit(fun () -> back_print :=true), "Back code intermediaire")
 ]
 
 (* SHOW HELP IN TERM (-h option) *)
@@ -101,7 +101,8 @@ let print_optim ast =
   let res = Beta.reduction res in 
   let res = Reduction.reduction res in
   let res = Inline.expansion res in
-  let res = Constant.constant res in
+  let res = Constant.folding res in
+  let res = Elim.elim_definition res in
   print_endline (Knorm.to_string res)
 
 let print_closure ast =
@@ -119,14 +120,15 @@ let iter_optim ast =
       let a = Beta.reduction ast in          (* Beta reduction *)
       let a = Reduction.reduction a in       (* Reduction of nested-let *)
       let a = Inline.expansion a in          (* Inline expansion *)
-      (* Constant folding | Elim. unnecessary def *)
-      a (* to_do : ne plus itérérer si on atteint un point fixe *)
+      let a = Constant.folding a in          (* Constant folding *)
+      let a = Elim.elim_definition a in      (* Elim. unnecessary def *)
+      iter_rec a (n-1) (* to do : si point fixe ???? *)
   in iter_rec ast !n_iter_optim
 
 let print_back ast =
   Typechecker.type_check ast;
   let ast = Knorm.normalize ast in
-  let ast = Alpha.conversion ast in 
+  let ast = Alpha.conversion ast in
   let ast = iter_optim ast in
   let ast = Closure.closure ast in
   let asml = Asml.generation ast in
@@ -158,6 +160,7 @@ let print_asml f =
     let ast = Knorm.normalize ast in         (* K-normalization *)
     let ast = Alpha.conversion ast in        (* Alpha-conversion *)
     let ast = iter_optim ast in              (* Optimisations *)
+    let ast = Reduction.reduction ast in     (* Reduction of nested-let *)
     let ast = Closure.closure ast in         (* Closure conversion *)
     let asml = Asml.generation ast in        (* ASML generation *)
                                              (* Immediate optimisation *)
@@ -173,8 +176,8 @@ let main (inp:string) (out:string) : unit =
     let ast = iter_optim ast in              (* Optimisations *)
     let ast = Closure.closure ast in         (* Closure conversion *)
     let asml = Asml.generation ast in        (* ASML generation *)
-                                             (* Immediate optimisation *)
-    let b = RegAlloc.parcours asml in           (* Register allocation *)                     
+                                               (* Immediate optimisation *)
+    let b = RegAlloc.parcours asml in          (* Register allocation *)                     
     let arm = Generation.generate_asm_reg b in (* ARM generation *)
     set_arm_file arm out                       (* Saving result in file *)
 
