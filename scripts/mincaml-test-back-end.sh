@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 cd .. || exit 1
 
 MINCAMLC=ocaml/mincamlc

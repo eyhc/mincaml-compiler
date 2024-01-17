@@ -6,9 +6,9 @@ OPTION=-t
 tests="tests/typechecking/"
 valid_tests="tests/typechecking/valid/"
 # test topics
-topics=("simples typechecking" "arithmetic operations" "call to external functions"
-    "if_then_else" "functions" "arrays and tuples" 
-    "closure" "floats" )
+# topics=("simples typechecking" "arithmetic operations" "call to external functions"
+#     "if_then_else" "functions" "arrays and tuples" 
+#     "closure" "floats" )
 old_topic_num=-1
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -21,14 +21,15 @@ failed=0
 
 # run all test cases in typechecking/valid and make sure they are typechecked without error
 # run all test cases in typechecking/invalid and make sure the compiler returns an error
-echo -e "---------------- TESTING TYPECHECKER ----------------\n"
+echo "---------------- TESTING TYPECHECKER ----------------\n"
 for dir_tests in $(ls "${tests}")
 do 
-    echo "${dir_tests^^} TESTS"
+    echo "$(echo "$dir_tests" | tr '[:lower:]' '[:upper:]') TESTS"
     for dir in $(ls "${tests}${dir_tests}")
     do
         topic_num=$(echo "$dir" | cut -d'-' -f1)
-        (( topic_num != old_topic_num )) &&  echo && echo -e "\t - Iteration $topic_num : ${topics[topic_num]} - "
+        topic_name=$(echo "$dir" | cut -d'-' -f2)
+        echo "\n\t - Iteration $topic_num : $topic_name - "
         tests_abs=$(pwd)"/${tests}${dir_tests}/${dir}/"
         test_files=`ls "$tests_abs"*.ml`
         for test_case in $test_files
@@ -39,38 +40,39 @@ do
             echo -n "Test on: "$file_name" ..."
             if $MINCAMLC $OPTION "$test_file" 2> /dev/null 1> /dev/null
             then
-                echo -e "${GREEN} OK${RESET}"
-                if [[ $valid = "valid" ]]
+                if [ "$valid" = "valid" ];
                 then
+                    echo "${GREEN} OK${RESET}"
                     passed=$((passed+1))
                 else
+                    echo "${RED} KO${RESET}"
                     failed=$((failed+1))
-                fi
+                fi;
             else
-                echo -e "${RED} KO${RESET}"
-                if [[ $valid = "valid" ]]
+                if [ "$valid" = "valid" ];
                 then
+                    echo "${RED} KO${RESET}"
                     failed=$((failed+1))
                 else
+                    echo "${GREEN} OK${RESET}"
                     passed=$((passed+1))
-                fi
+                fi;
             fi
             old_topic_num=$topic_num; 
-            num_test=$(($num_test+1))
         done
     done
-    if [[ $dir_tests = "invalid" ]]
+    if [ "$dir_tests" = "invalid" ];
     then
-        echo -e "\n..................................................."
+        echo "\n..................................................."
     else
         echo
     fi
 done
 
 echo "---------- END TESTING ----------"
-echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they return KO)"
+echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they succeed to fail)"
 echo "Tests failed : $failed / $((passed + failed))"
-echo -e "-----------------------------------\n"
-echo -e "\n- Typechecker -" >> resultats_tests.txt
-echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they return KO)" >> resultats_tests.txt
+echo "-----------------------------------\n"
+echo "\n- Typechecker -" >> resultats_tests.txt
+echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they succeed to fail)" >> resultats_tests.txt
 echo "Tests failed : $failed / $((passed + failed))" >> resultats_tests.txt

@@ -18,7 +18,7 @@ failed=0
 # run all test cases in syntax/valid and make sure they are parsed without error
 # run all test cases in syntax/invalid and make sure the parser returns an error
 
-echo -e "------------------ TESTING PARSER ------------------\n"
+echo "------------------ TESTING PARSER ------------------\n"
 for test_case in tests/syntax/valid/*.ml
 do
     file=$(basename $test_case)
@@ -27,10 +27,10 @@ do
     echo -n "Test on: "$test_case" ..."
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then 
-        echo -e "${GREEN} OK${RESET}"
+        echo "${GREEN} OK${RESET}"
         passed=$((passed+1))
     else
-        echo -e "${RED} KO${RESET}"
+        echo "${RED} KO${RESET}"
         failed=$((failed+1))
     fi
 done
@@ -43,19 +43,19 @@ do
     echo -n "Test on: "$test_case" ..."
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
-        echo -e "${GREEN} OK${RESET}"
+        echo "${RED} KO${RESET}"
         failed=$((failed+1))
     else 
-        echo -e "${RED} KO${RESET}"
+        echo "${GREEN} OK${RESET}"
         passed=$((passed+1))
     fi
 done
 
-echo -e "\n---------- END TESTING ----------"
-echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they return KO)"
+echo "\n---------- END TESTING ----------"
+echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they succeed to fail)"
 echo "Tests failed : $failed / $((passed + failed))"
-echo -e "-----------------------------------\n"
+echo "-----------------------------------\n"
 echo "RESUME DES TESTS" > resultats_tests.txt
 echo "- Parser -" >> resultats_tests.txt
-echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they return KO)" >> resultats_tests.txt
-echo -e "Tests failed : $failed / $((passed + failed))" >> resultats_tests.txt
+echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they succeed to fail)" >> resultats_tests.txt
+echo "Tests failed : $failed / $((passed + failed))" >> resultats_tests.txt

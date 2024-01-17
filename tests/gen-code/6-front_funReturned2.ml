@@ -10,6 +10,6 @@ let rec make_operator x y =
   else
     sub
 in
-let a = 10 in
-let b = 20 in
+let a = 20 in
+let b = 10 in
 print_int ((make_operator a b) a b)
