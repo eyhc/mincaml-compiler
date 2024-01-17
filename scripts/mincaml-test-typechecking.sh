@@ -21,7 +21,7 @@ failed=0
 
 # run all test cases in typechecking/valid and make sure they are typechecked without error
 # run all test cases in typechecking/invalid and make sure the compiler returns an error
-echo -e "---------- TESTING TYPECHECKER ----------\n"
+echo -e "---------------- TESTING TYPECHECKER ----------------\n"
 for dir_tests in $(ls "${tests}")
 do 
     echo "${dir_tests^^} TESTS"

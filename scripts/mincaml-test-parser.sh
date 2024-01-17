@@ -18,7 +18,7 @@ failed=0
 # run all test cases in syntax/valid and make sure they are parsed without error
 # run all test cases in syntax/invalid and make sure the parser returns an error
 
-echo "---------- TESTING PARSER ----------"
+echo -e "------------------ TESTING PARSER ------------------\n"
 for test_case in tests/syntax/valid/*.ml
 do
     file=$(basename $test_case)
