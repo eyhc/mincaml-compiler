@@ -9,6 +9,13 @@ type t =
   | Neg of Id.t
   | Add of Id.t * Id.t
   | Sub of Id.t * Id.t
+  (* Pour les floats *)
+  | Float of float
+  | FNeg of Id.t
+  | FAdd of Id.t * Id.t
+  | FSub of Id.t * Id.t
+  | FMul of Id.t * Id.t
+  | FDiv of Id.t * Id.t
   (* Tuples *)
   | Tuple of Id.t list
   (* Arrays *)
@@ -50,9 +57,15 @@ let rec to_string ?(p: string = "") exp: string =
   | Unit -> "()"
   | Var id -> sprintf("%s%s") p (Id.to_string id)
   | Int i -> string_of_int i
+  | Float f -> string_of_float f
   | Neg x -> Id.to_string x
   | Add(a, b) -> sprintf("%s%s + %s") p a b
   | Sub(a, b) -> sprintf("%s%s - %s") p a b
+  | FNeg x -> Id.to_string x
+  | FAdd(a, b) -> sprintf("%s%s +. %s") p a b
+  | FSub(a, b) -> sprintf("%s%s -. %s") p a b
+  | FMul(a, b) -> sprintf("%s%s *. %s") p a b
+  | FDiv(a, b) -> sprintf("%s%s /. %s") p a b
   | Tuple(vars) -> sprintf("(%s)") (Syntax.infix_to_string Id.to_string vars ", ")
   | Array(a, b) -> sprintf("Array.create %s %s") a b
   | Get(a, b) -> sprintf("%s.(%s)") a b
@@ -94,7 +107,7 @@ let rec fun_free_vars (env: VarSet.t) (parent: Id.t * VarSet.t) (exp: Knorm.knor
   in
   match exp with
   | Var(id) when List.exists (fun (x, y) -> x = id) (VarSet.elements env) -> VarSet.singleton (find_id_type id)
-  | Add(a, b) | Sub(a, b) | Array(a, b) | Get(a, b) ->
+  | Add(a, b) | Sub(a, b) | FAdd(a, b) | FSub(a, b) | FMul(a, b) | FDiv(a, b) | Array(a, b) | Get(a, b) ->
       let set = VarSet.singleton (find_id_type a) in
       VarSet.add (find_id_type b) set
   | Tuple(vars) -> VarSet.of_list (List.map (fun x -> find_id_type x) vars)
@@ -157,12 +170,15 @@ let convert (exp: Knorm.knorm_t): fundef list * t =
         MakeCls((new_id, snd f.label), label, List.map fst f.frees, Var(new_id))
     | Var(id) -> Var(id)
     | Int i -> Int(i)
+    | Float f -> Float(f)
     | Neg x -> Neg(x)
     | Add(a, b) -> Add(rename a, rename b)
     | Sub(a, b) -> Sub(rename a, rename b)
-    | Tuple(vars) -> 
-        let id = Id.genid () in
-        Let((id, Type.Unit), Tuple(List.map rename vars), Var(id))
+    | FNeg x -> FNeg(x)
+    | FAdd(a, b) -> FAdd(rename a, rename b)
+    | FSub(a, b) -> FSub(rename a, rename b)
+    | FMul(a, b) -> FMul(rename a, rename b)
+    | FDiv(a, b) -> FDiv(rename a, rename b)
     | Array(a, b) -> Array(rename a, rename b)
     | Get(a, b) -> Get(rename a, rename b)
     | Put(a, b, c) -> Put(rename a, rename b, rename c)
@@ -180,12 +196,12 @@ let convert (exp: Knorm.knorm_t): fundef list * t =
           Let((new_id, snd f.label), ApplyCls(id, convert_args args), worker ~to_rename:[(id, new_id)] env' next))
         else
           Let((id, t), ApplyDir(genlabel name, convert_args args), worker env' next)
+    | Let((id, t), Tuple(vars), next) ->
+      let env' = VarSet.add (id, t) env in
+      Let((id, t), Tuple(vars), worker env' next)
     | Let((id, t), value, next) -> 
         let env' = VarSet.add (id, t) env in
         Let((id, t), worker env value, worker env' next)
-    | Let((id, t), Tuple(vars), next) ->
-        let env' = VarSet.add (id, t) env in
-        Let((id, t), Tuple(List.map rename vars), worker env' next)
     | LetRec(fd, next) ->
       (* Ajout des paramètres de la fonction à l'environnement *)
       let env' = VarSet.union (VarSet.of_list fd.args) env in
@@ -217,6 +233,9 @@ let convert (exp: Knorm.knorm_t): fundef list * t =
     | App(name, args) when Typechecker.is_prefef_fun name -> ApplyDir(name, List.map rename (convert_args args))
     (* Appel d'une fonction dans une closure *)
     | App(name, args) -> ApplyCls(rename name, List.map rename (convert_args args))
+    | Tuple(vars) -> 
+      let id = Id.genid () in
+      Let((id, Type.Unit), Tuple(List.map rename vars), Var(id))
     | _ -> failwith "Expression inconnue"
   (*** Code de convert ***)
   in (!funs, worker VarSet.empty exp)

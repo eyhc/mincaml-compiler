@@ -1,0 +1,51 @@
+
+let _t4043 = 6.
+let _t3884 = 2.5
+let _applyOperation44 t45 valeur46 =
+  let t3448 = 0 in
+  let t3551 = 0 in
+  let t3650 = mem(t45 + t3551) in
+  let t3749 = (fadd t3650 valeur46) in
+  let t1047 = mem(t45 + t3448) <- t3749 in
+  let t3254 = 0 in
+  let t3353 = mem(t45 + t3254) in
+  let t952 = call _min_caml_print_float t3353 in
+  let t3156 = nop in
+  let t855 = call _min_caml_print_newline () in
+  let t2758 = 1 in
+  let t2861 = 1 in
+  let t2960 = mem(t45 + t2861) in
+  let t3059 = (fsub t2960 valeur46) in
+  let t757 = mem(t45 + t2758) <- t3059 in
+  let t2564 = 1 in
+  let t2663 = mem(t45 + t2564) in
+  let t662 = call _min_caml_print_float t2663 in
+  let t2466 = nop in
+  let t565 = call _min_caml_print_newline () in
+  let t2068 = 2 in
+  let t2171 = 2 in
+  let t2270 = mem(t45 + t2171) in
+  let t2369 = (fdiv t2270 valeur46) in
+  let t467 = mem(t45 + t2068) <- t2369 in
+  let t1874 = 2 in
+  let t1973 = mem(t45 + t1874) in
+  let t372 = call _min_caml_print_float t1973 in
+  let t1776 = nop in
+  let t275 = call _min_caml_print_newline () in
+  let t1378 = 3 in
+  let t1481 = 3 in
+  let t1580 = mem(t45 + t1481) in
+  let t1679 = (fmul t1580 valeur46) in
+  let t177 = mem(t45 + t1378) <- t1679 in
+  let t1183 = 3 in
+  let t1282 = mem(t45 + t1183) in
+  call _min_caml_print_float t1282
+
+let _ = 
+  let t3942 = 4 in
+  let t86 = _t4043 in
+  let t4043 = mem(t86 + 0) in
+  let tableau41 = call _min_caml_create_float_array t3942 t4043 in
+  let t85 = _t3884 in
+  let t3884 = mem(t85 + 0) in
+  call _applyOperation44 tableau41 t3884

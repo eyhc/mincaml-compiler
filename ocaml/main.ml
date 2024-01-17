@@ -162,7 +162,6 @@ let print_asml f =
     let ast = Reduction.reduction ast in     (* Reduction of nested-let *)
     let ast = Closure.closure ast in         (* Closure conversion *)
     let asml = Asml.generation ast in        (* ASML generation *)
-                                             (* Immediate optimisation *)
     print_endline (Asml.to_string asml)      (* Displaying *)
 
 

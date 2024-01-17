@@ -5,6 +5,7 @@ date : 09-02-2023
 *)
 
 open Printf
+open Utils
 
 (************************
     Types definitions
@@ -42,7 +43,7 @@ and asmt =
 | EXP of expr
 and letdef =
 | Main of asmt
-| LetFloat of float
+| LetFloat of Id.t * float
 | LetLabel of Id.l * Id.t list * asmt
 and asml = letdef list
 
@@ -59,11 +60,13 @@ let call_predef (f:Id.l) (vars:Id.t list) : expr =
   | "cos" -> CALL ("_min_caml_cos", vars)
   | "sqrt" -> CALL ("_min_caml_sqrt", vars)
   | "abs" -> CALL ("_min_caml_abs", vars)
-  | "abs_float" -> CALL ("_min_caml_abs", vars)
-  | "int_of_float" -> CALL ("_min_caml_abs", vars)
+  | "abs_float" -> CALL ("_min_caml_abs_float", vars)
+  | "int_of_float" -> CALL ("_min_caml_int_of_float", vars)
   | "float_of_int" -> CALL ("_min_caml_float_of_int", vars)
   | "truncate" -> CALL ("_min_caml_truncate", vars)
   | _ -> failwith (sprintf "asml generation : %s not a predef function" f)
+
+let floatsdef: letdef list ref = ref [];;
 
 let funsdef: Closure.fundef list ref = ref [];;
 
@@ -149,6 +152,20 @@ and generation_tuple (id: Id.t) (vars: Id.t list) (e1: Closure.t): asmt =
   in
   LET(id, NEW(Const(size * 4)), gen id 0 vars (generation_asmt e1))
 
+and generation_arraycreate (id: Id.t) (typ: Type.t) (size: Id.t) (default: Id.t) (e1: asmt): asmt =
+  let f = 
+    match typ with
+    | Type.Float -> "_min_caml_create_float_array"
+    | _ -> "_min_caml_create_array"
+  in
+  LET(id, CALL(f, [size; default]), e1)
+
+and generation_float (id: Id.t) (f: float) (e1: asmt): asmt =
+  floatsdef := LetFloat("_"^id, f) :: !floatsdef;
+  let addr_id = Id.genid () in
+  let load = LET(id, MEMGET(addr_id, Const(0)), e1) in
+  LET(addr_id, LABEL("_"^id), load)
+
 and generation_expr (a:Closure.t) : expr =
   match a with
   | Unit -> NOP
@@ -159,32 +176,48 @@ and generation_expr (a:Closure.t) : expr =
   | Add (x, y) -> ADD (x, Var y)
   | Sub (x, y) -> SUB (x, Var y)
 
+  | FNeg x -> FNEG(x)
+  | FAdd (x, y) -> FADD(x, y)
+  | FSub (x, y) -> FSUB(x, y)
+  | FMul (x, y) -> FMUL(x, y)
+  | FDiv (x, y) -> FDIV(x, y)
+
   | IfEq (x, y, at1, at2) -> 
     IFEQ((x, Var y), generation_asmt at1, generation_asmt at2)
   | IfLE (x, y, at1, at2) ->
     IFLE((x, Var y), generation_asmt at1, generation_asmt at2)
+
   | ApplyDir(f, vars) -> if Typechecker.is_prefef_fun f then call_predef f vars else CALL(f, vars)
   | ApplyCls(l, vars) -> CALLCLO(l, vars)
-  | _ -> printf("%s\n\n") (Closure.to_string a); assert false
 
-and generation_asmt (a:Closure.t) : asmt = 
-  match a with
-  | Let((x, t), Array(a, b), e1) -> LET(x, CALL("_min_caml_create_array", [a; b]), generation_asmt e1)
-  | Let((x, t), Get(a, b), e1) -> LET(x, MEMGET(a, Var(b)), generation_asmt e1)
-  | Let((x, t), Put(a, b, c), e1) -> LET(x, MEMASSIGN(a, Var(b), c), generation_asmt e1)
-  | Let((x, t), Tuple(vars), e1) -> generation_tuple x vars e1
-  | Let((x, t), ApplyDir(f, args), e1) -> generation_let_with_apply x f args e1
-  | Let ((x, t), e1, e2) -> LET(x, generation_expr e1, generation_asmt e2)
+  | Get(a, b) -> MEMGET(a, Var(b))
+  | Put(a, b, c) -> MEMASSIGN(a, Var(b), c)
+  | _ -> printf("%s\n") (Closure.to_string a); assert false
+
+and generation_asmt ?(env: VarSet.t = VarSet.empty) (a:Closure.t) : asmt = 
+  match a with      
+  | Let ((x, t), e1, e2) -> 
+      let env' = VarSet.add (x, t) env in
+      (match e1 with
+      | ApplyDir(f, args) -> generation_let_with_apply x f args e2
+      | Tuple(vars) -> generation_tuple x vars e2
+      | Array(size, default) -> 
+          let at = snd (List.find (fun (y, z) -> y = default) (VarSet.elements env)) in
+          generation_arraycreate x at size default (generation_asmt ~env:env' e2)
+      | Float(f) -> generation_float x f (generation_asmt ~env:env' e2)
+      | _ -> LET(x, generation_expr e1, generation_asmt ~env:env' e2))
   | LetTuple(vars, tuple, e1) -> 
+      let env' = VarSet.union (VarSet.of_list vars) env in
       let rec gen (n: int) (vs: (Id.t * Type.t) list): asmt =
         match vs with
-        | [(x, y)] -> LET(x, MEMGET(tuple, Const(n)), (generation_asmt e1))
+        | [(x, y)] -> LET(x, MEMGET(tuple, Const(n)), (generation_asmt ~env:env' e1))
         | (x, y) :: tail -> LET(x, MEMGET(tuple, Const(n)), gen (n+4) tail)
         | _ -> assert false
       in gen 0 vars
   | MakeCls((x, t), l, args, e1) -> 
+      let env' = VarSet.add (x, t) env in
       let f = get_fdef l in
-      make_closure x (fst f.label) (List.map fst f.frees) (generation_asmt e1)
+      make_closure x (fst f.label) (List.map fst f.frees) (generation_asmt ~env:env' e1)
   | _ -> EXP (generation_expr a)
 
 let rec generation_letdef (a:Closure.fundef) : letdef =
@@ -196,13 +229,21 @@ let rec generation_letdef (a:Closure.fundef) : letdef =
   in
   LetLabel (fst a.label, List.map fst a.args, add_load_frees 4 (List.map fst a.frees) (generation_asmt a.code))
 
+(* 
+Génère le code asml équivalent au programme en paramètre
+Paramètres:
+- ast -> l'ast du programme
+Retourne: un élément de type asml
+*)
 let rec generation (ast:Closure.t) : asml = 
  match ast with
  | Prog (fcts, main) -> 
+    floatsdef := [];
     funsdef := fcts;
-    (List.map generation_letdef fcts) @ [Main (generation_asmt main)]
- | _ -> failwith "Not correct closure form"
-
+    let funs = List.map generation_letdef fcts in
+    let main = Main(generation_asmt main) in
+    !floatsdef @ funs @ [main]
+ | _ -> failwith "Not correct closure form" 
 
 (************************
    To string functions
@@ -251,7 +292,7 @@ and to_string_asmt (p: string) (a:asmt) : string =
 let rec to_string_letdef (l:letdef) : string =
   match l with
   | Main asmt -> sprintf "let _ = \n%s" (to_string_asmt "  " asmt)
-  | LetFloat f -> Float.to_string f
+  | LetFloat(l, f) -> sprintf "let %s = %s" (Id.to_string l) (string_of_float f)
   | LetLabel (l, args, asmt) -> sprintf "let %s %s =\n%s\n" l (Syntax.infix_to_string Id.to_string args " ") (to_string_asmt "  " asmt)
 
 let to_string (a:asml) : string =
@@ -308,7 +349,7 @@ and string_asmt (a:asmt) : string =
 let rec string_letdef (l:letdef) : string =
   match l with
   | Main asmt -> sprintf "Main (%s)" (string_asmt asmt)
-  | LetFloat f -> failwith "todo"
+  | LetFloat(l, f) -> failwith "todo"
   | LetLabel (l, args, asmt) -> failwith "todo"
 
 let string_struct (a:asml) =
