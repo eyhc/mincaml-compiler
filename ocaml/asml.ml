@@ -83,13 +83,13 @@ let is_freefun (name: Id.t): bool =
   else
     false
 
-let rec frees_mem_assign (p: Id.t) (n: int) (frees: Id.t list) (next: asmt): asmt =
-  match frees with
-  | [x] -> LET(Id.genid (), MEMASSIGN(p, Const(n), x), next)
-  | x :: tail -> LET(Id.genid (), MEMASSIGN(p, Const(n), x), frees_mem_assign p (n+4) tail next)
-  | _ -> assert false
-
 let make_closure (id: Id.t) (f: Id.t) (frees: Id.t list) (next: asmt): asmt =
+  let rec frees_mem_assign (p: Id.t) (n: int) (frees: Id.t list) (next: asmt): asmt =
+    match frees with
+    | [x] -> LET(Id.genid (), MEMASSIGN(p, Const(n), x), next)
+    | x :: tail -> LET(Id.genid (), MEMASSIGN(p, Const(n), x), frees_mem_assign p (n+4) tail next)
+    | _ -> assert false
+  in
   let size = (List.length frees + 1) * 4 in
   let addr_id = Id.genid () in
   let mem_frees = frees_mem_assign id 0 (addr_id :: frees) next in
@@ -97,52 +97,28 @@ let make_closure (id: Id.t) (f: Id.t) (frees: Id.t list) (next: asmt): asmt =
   let pointer = LET(id, NEW(Const(size)), f_addr) in
   pointer
 
-let rec generation_let_with_apply (id: Id.t) (f: Id.t) (args: Id.t list) (next: Closure.t): asmt =
-  (* L'ensemble des arguments qui sont des fonctions avec au moins une variable libre *)
-  let freefuns_args = List.filter (fun x -> is_freefun x) args in
-  if List.length freefuns_args > 0 then
-    (* La liste des arguments à remplacer dans le call *)
-    let args_ids = (List.map (fun x -> (x, Id.genid ())) freefuns_args) in
-    let get_id (x: Id.t) : Id.t =
-      snd (List.find (fun (y, z) -> y = x) args_ids)
-    in
-    let rec funs_as_params (names: Id.t list) (next: asmt): asmt =
-      match names with
-      | [x] -> let f = get_fdef x in make_closure (get_id x) (fst f.label) (List.map fst f.frees) next
-      | x :: tail -> let f = get_fdef x in make_closure (get_id x) (fst f.label) (List.map fst f.frees) (funs_as_params tail next)
+let rec generation_call (id: Id.t) (f: Id.t) (args: Id.t list) (next: asmt): asmt =
+  (* Ensemble des paramètres qui sont des fonctions *)
+  let f_args = List.filter (fun x -> is_fun x) args in
+  if List.length f_args > 0 then
+    (* Au moins un des paramètres est une fonction *)
+    (* Pour chaque argument qui est une fonction, on génère une variable qui va contenir la closure pour cette fonction *)
+    let args_ids = (List.map (fun x -> (x, Id.genid ())) f_args) in
+    let rec generate_funs_closure (args: (Id.t * Id.t) list) (next: asmt): asmt =
+      match args with
+      | [(x, y)] -> let f = get_fdef x in make_closure y (fst f.label) (List.map fst f.frees) next
+      | (x, y) :: tail -> let f = get_fdef x in make_closure y (fst f.label) (List.map fst f.frees) (generate_funs_closure tail next)
       | _ -> assert false
     in
     (* Le call avec les arguments mis à jour *)
     let call = CALL(f, List.map (fun x -> if List.exists (fun y -> (fst y) = x) args_ids then snd (List.find (fun y -> (fst y) = x) args_ids) else x) args) in
-    let call = LET(id, call, generation_asmt next) in
-    funs_as_params freefuns_args call
-  (* Le call contient des fonctions en paramètres mais qui n'ont pas de variables libres *)
-  else if List.exists is_fun args then
-    let rec make_closure_for_args (args: (Id.t * Id.t) list) (next: asmt): asmt =
-      match args with
-      | [(x, y)] -> make_closure y x [] next
-      | (x, y) :: tail -> make_closure y x [] (make_closure_for_args tail next)
-      | _ -> assert false
-    in
-    let new_args = List.map (fun x -> (x, Id.genid ())) args in
-    let renamed_args = List.map (fun x -> if is_fun x then snd (List.find (fun (y, z) -> x = y) new_args) else x) args in
-    let call = LET(id, 
-      (if Typechecker.is_prefef_fun f then
-        call_predef f renamed_args
-      else
-        CALL(f, renamed_args))
-      , generation_asmt next)
-    in
-    make_closure_for_args new_args call
+    let call = LET(id, call, next) in
+    generate_funs_closure args_ids call
   else
-    LET(id, 
-    (if Typechecker.is_prefef_fun f then
-      call_predef f args
-    else
-      CALL(f, args))
-    , generation_asmt next)
+    (* Aucun des arguments n'est une fonction *)
+    LET(id, (if Typechecker.is_prefef_fun f then call_predef f args else CALL(f, args)), next)
 
-and generation_tuple (id: Id.t) (vars: Id.t list) (e1: Closure.t): asmt =
+and generation_tuple (id: Id.t) (vars: Id.t list) (e1: asmt): asmt =
   let size = List.length vars in
   let rec gen (p: Id.t) (n: int) (vs: Id.t list) (next: asmt): asmt =
     match vs with
@@ -150,7 +126,7 @@ and generation_tuple (id: Id.t) (vars: Id.t list) (e1: Closure.t): asmt =
     | x :: tail -> LET(Id.genid (), MEMASSIGN(id, Const(n), x), gen p (n+4) tail next)
     | _ -> assert false
   in
-  LET(id, NEW(Const(size * 4)), gen id 0 vars (generation_asmt e1))
+  LET(id, NEW(Const(size * 4)), gen id 0 vars e1)
 
 and generation_arraycreate (id: Id.t) (typ: Type.t) (size: Id.t) (default: Id.t) (e1: asmt): asmt =
   let f = 
@@ -186,7 +162,7 @@ and generation_expr (a:Closure.t) : expr =
     IFEQ((x, Var y), generation_asmt at1, generation_asmt at2)
   | IfLE (x, y, at1, at2) ->
     IFLE((x, Var y), generation_asmt at1, generation_asmt at2)
-
+    
   | ApplyDir(f, vars) -> if Typechecker.is_prefef_fun f then call_predef f vars else CALL(f, vars)
   | ApplyCls(l, vars) -> CALLCLO(l, vars)
 
@@ -195,12 +171,12 @@ and generation_expr (a:Closure.t) : expr =
   | _ -> printf("%s\n") (Closure.to_string a); assert false
 
 and generation_asmt ?(env: VarSet.t = VarSet.empty) (a:Closure.t) : asmt = 
-  match a with      
+  match a with
   | Let ((x, t), e1, e2) -> 
       let env' = VarSet.add (x, t) env in
       (match e1 with
-      | ApplyDir(f, args) -> generation_let_with_apply x f args e2
-      | Tuple(vars) -> generation_tuple x vars e2
+      | ApplyDir(f, args) -> generation_call x f args (generation_asmt e2)
+      | Tuple(vars) -> generation_tuple x vars (generation_asmt e2)
       | Array(size, default) -> 
           let at = snd (List.find (fun (y, z) -> y = default) (VarSet.elements env)) in
           generation_arraycreate x at size default (generation_asmt ~env:env' e2)
@@ -208,12 +184,12 @@ and generation_asmt ?(env: VarSet.t = VarSet.empty) (a:Closure.t) : asmt =
       | _ -> LET(x, generation_expr e1, generation_asmt ~env:env' e2))
   | LetTuple(vars, tuple, e1) -> 
       let env' = VarSet.union (VarSet.of_list vars) env in
-      let rec gen (n: int) (vs: (Id.t * Type.t) list): asmt =
+      let rec generate_memget (n: int) (vs: (Id.t * Type.t) list): asmt =
         match vs with
         | [(x, y)] -> LET(x, MEMGET(tuple, Const(n)), (generation_asmt ~env:env' e1))
-        | (x, y) :: tail -> LET(x, MEMGET(tuple, Const(n)), gen (n+4) tail)
+        | (x, y) :: tail -> LET(x, MEMGET(tuple, Const(n)), generate_memget (n+4) tail)
         | _ -> assert false
-      in gen 0 vars
+      in generate_memget 0 vars
   | MakeCls((x, t), l, args, e1) -> 
       let env' = VarSet.add (x, t) env in
       let f = get_fdef l in
@@ -221,6 +197,7 @@ and generation_asmt ?(env: VarSet.t = VarSet.empty) (a:Closure.t) : asmt =
   | _ -> EXP (generation_expr a)
 
 let rec generation_letdef (a:Closure.fundef) : letdef =
+  (* Ajoute le chargement des variables libres de la fonction au début du code de celle-ci *)
   let rec add_load_frees (n: int) (frees: Id.t list) (code: asmt) : asmt =
     match frees with
     | [] -> code
@@ -236,23 +213,23 @@ Paramètres:
 Retourne: un élément de type asml
 *)
 let rec generation (ast:Closure.t) : asml = 
- match ast with
- | Prog (fcts, main) -> 
+  match ast with
+  | Prog (fcts, main) -> 
     floatsdef := [];
     funsdef := fcts;
     let funs = List.map generation_letdef fcts in
     let main = Main(generation_asmt main) in
     !floatsdef @ funs @ [main]
- | _ -> failwith "Not correct closure form" 
+  | _ -> failwith "Not correct closure form" 
 
 (************************
    To string functions
 ************************)
 
 let to_string_id_imm (x:id_or_imm) : string =
- match x with
- | Var x -> Id.to_string x
- | Const i -> string_of_int i
+  match x with
+  | Var x -> Id.to_string x
+  | Const i -> string_of_int i
 
 let rec to_string_exp ?(p: string = "") (e:expr) = 
   let string_if(v1: string) (v2: string) (a1: asmt) (a2: asmt) (op: string): string =

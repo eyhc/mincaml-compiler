@@ -58,7 +58,7 @@ let rec to_string ?(p: string = "") exp: string =
   | Var id -> sprintf("%s%s") p (Id.to_string id)
   | Int i -> string_of_int i
   | Float f -> string_of_float f
-  | Neg x -> Id.to_string x
+  | Neg x -> "-" ^ Id.to_string x
   | Add(a, b) -> sprintf("%s%s + %s") p a b
   | Sub(a, b) -> sprintf("%s%s - %s") p a b
   | FNeg x -> Id.to_string x
@@ -128,8 +128,6 @@ let rec fun_free_vars (env: VarSet.t) (parent: Id.t * VarSet.t) (exp: Knorm.knor
   | LetTuple(vars, tuple, next) -> 
       let env' = VarSet.union (VarSet.of_list vars) env in
       VarSet.diff (VarSet.add (find_id_type tuple) (fun_free_vars env' parent next)) (VarSet.of_list vars)
-  | App(name, args) when List.exists (fun (x,y) -> x = name) (VarSet.elements env) -> VarSet.add (find_id_type name) (VarSet.union (VarSet.of_list (List.map (fun x -> find_id_type x) args))
-      (if name == fst parent then snd parent else VarSet.empty))
   | App(name, args) -> VarSet.union (VarSet.of_list (List.map (fun x -> find_id_type x) args))
       (if name == fst parent then snd parent else VarSet.empty)
   | _ -> VarSet.empty
@@ -148,18 +146,14 @@ let convert (exp: Knorm.knorm_t): fundef list * t =
   (* 
     Fonction utilitaire pour convert
     Paramètres:
-    - to_rename (optionnel): ensemble de nom à renommer
     - parent (optionnel): la fonction dans laquelle se trouve l'expression
     - env: l'environnemnt de l'expression, un ensemble de variables
     - e: l'expression à convertir
     Retourne: l'expression e convertit en type t avec la closure conversion appliquée dessus
   *)
-  let rec worker ?(to_rename: (Id.t * Id.t) list = []) ?(parent: Id.t * VarSet.t = ("", VarSet.empty)) (env: VarSet.t) (e: Knorm.knorm_t): t =
-    let rename (name: Id.t): Id.t =
-      if List.exists (fun (y,z) -> y = name) to_rename then 
-        snd (List.find (fun (y,z) -> y = name) to_rename) 
-      else
-        name
+  let rec worker ?(parent: Id.t * VarSet.t = ("", VarSet.empty)) (env: VarSet.t) (e: Knorm.knorm_t): t =
+    let get_type (id: Id.t): Type.t =
+      snd (List.find (fun (x, y) -> x = id) (VarSet.elements env))
     in
     match e with
     | Unit -> Unit
@@ -172,36 +166,34 @@ let convert (exp: Knorm.knorm_t): fundef list * t =
     | Int i -> Int(i)
     | Float f -> Float(f)
     | Neg x -> Neg(x)
-    | Add(a, b) -> Add(rename a, rename b)
-    | Sub(a, b) -> Sub(rename a, rename b)
+    | Add(a, b) -> Add(a, b)
+    | Sub(a, b) -> Sub(a, b)
     | FNeg x -> FNeg(x)
-    | FAdd(a, b) -> FAdd(rename a, rename b)
-    | FSub(a, b) -> FSub(rename a, rename b)
-    | FMul(a, b) -> FMul(rename a, rename b)
-    | FDiv(a, b) -> FDiv(rename a, rename b)
-    | Array(a, b) -> Array(rename a, rename b)
-    | Get(a, b) -> Get(rename a, rename b)
-    | Put(a, b, c) -> Put(rename a, rename b, rename c)
+    | FAdd(a, b) -> FAdd(a, b)
+    | FSub(a, b) -> FSub(a, b)
+    | FMul(a, b) -> FMul(a, b)
+    | FDiv(a, b) -> FDiv(a, b)
+    | Get(a, b) -> Get(a, b)
+    | Put(a, b, c) -> Put(a, b, c)
     | IfEq((a, b), th, els) -> 
         IfEq(a, b, worker env th, worker env els)
     | IfLE((a, b), th, els) -> 
         IfLE(a, b, worker env th, worker env els)
-    (* Les let qui contiennent le résultat de l'appel d'une fonction *)
-    | Let((id, t), App(name, args), next) when List.exists (fun x -> (fst x.label) = genlabel name) !funs ->
-        let env' = VarSet.add (id, t) env in
-        let f = List.find (fun x -> (fst x.label) = (genlabel name)) !funs in
-        if List.length f.frees > 0 then
-          let new_id = Id.genid () in
-          MakeCls((id, t), genlabel name, List.map fst f.frees, 
-          Let((new_id, snd f.label), ApplyCls(id, convert_args args), worker ~to_rename:[(id, new_id)] env' next))
-        else
-          Let((id, t), ApplyDir(genlabel name, convert_args args), worker env' next)
-    | Let((id, t), Tuple(vars), next) ->
-      let env' = VarSet.add (id, t) env in
-      Let((id, t), Tuple(vars), worker env' next)
     | Let((id, t), value, next) -> 
-        let env' = VarSet.add (id, t) env in
-        Let((id, t), worker env value, worker env' next)
+      let env' = VarSet.add (id, t) env in
+      (match value with
+      (* Les let qui contiennent le résultat de l'appel d'une fonction *)
+      | App(name, args) when List.exists (fun x -> (fst x.label) = genlabel name) !funs ->
+          let f = List.find (fun x -> (fst x.label) = (genlabel name)) !funs in
+          if List.length f.frees > 0 then
+            let new_id = Id.genid () in
+            MakeCls((new_id, t), genlabel name, List.map fst f.frees, 
+            Let((id, snd f.label), ApplyCls(new_id, convert_args args), worker env' next))
+          else
+            Let((id, t), ApplyDir(genlabel name, convert_args args), worker env' next)
+      | Tuple(vars) -> Let((id, t), Tuple(vars), worker env' next)
+      | Array(a, b) -> Let((id, t), Array(a, b), worker env' next)
+      | _ -> Let((id, t), worker env value, worker env' next))
     | LetRec(fd, next) ->
       (* Ajout des paramètres de la fonction à l'environnement *)
       let env' = VarSet.union (VarSet.of_list fd.args) env in
@@ -225,18 +217,23 @@ let convert (exp: Knorm.knorm_t): fundef list * t =
         if List.length f.frees > 0 then
           (* Fonction avec au moins une variable libre *)
           let id = Id.genid () in
-          MakeCls((id, Type.Unit), genlabel name, List.map fst f.frees, ApplyCls(id, List.map rename (convert_args args)))
+          MakeCls((id, Type.Unit), genlabel name, List.map fst f.frees, ApplyCls(id, convert_args args))
         else
           (* Fonction sans variables libres *)
-          ApplyDir(genlabel name, List.map rename (convert_args args))
+          ApplyDir(genlabel name, convert_args args)
     (* Appel d'une fonction prédéfinie (print_int par exemple) *)
-    | App(name, args) when Typechecker.is_prefef_fun name -> ApplyDir(name, List.map rename (convert_args args))
+    | App(name, args) when Typechecker.is_prefef_fun name -> ApplyDir(name, convert_args args)
     (* Appel d'une fonction dans une closure *)
-    | App(name, args) -> ApplyCls(rename name, List.map rename (convert_args args))
-    | Tuple(vars) -> 
+    | App(name, args) -> ApplyCls(name, convert_args args)
+    (* On place les déclarations de tableau dans des variables pour simplifier la génération de l'ASML *)
+    | Array(a, b) ->
       let id = Id.genid () in
-      Let((id, Type.Unit), Tuple(List.map rename vars), Var(id))
-    | _ -> failwith "Expression inconnue"
+      Let((id, get_type b), Array(a, b), Var(id))
+    (* On place les déclarations de tuples dans des variables pour simplifier la génération de l'ASML *)
+    | Tuple(vars) ->
+        let id = Id.genid () in
+        let ts = List.map get_type vars in
+        Let((id, Type.Tuple(ts)), Tuple(vars), Var(id))
   (*** Code de convert ***)
   in (!funs, worker VarSet.empty exp)
 

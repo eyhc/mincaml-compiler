@@ -8,7 +8,9 @@ let rec addition a b c =
     let z = 4 in 
     let w = 6 in
     let j = x + z + w in
-   j + a in
+   j + a 
+  in
   let res = add2 c in
-  print_int(d + res) in
-  addition 1 2 4
+  print_int (d + res)
+in
+addition 1 2 4
