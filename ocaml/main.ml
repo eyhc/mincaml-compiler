@@ -32,13 +32,12 @@ let speclist = [
   ("-asml", Arg.Unit (fun () -> asml_only := true), "Print asml");
   ("-p", Arg.Unit (fun () -> parse_only := true), "Parse only");
   ("-n_iter", Arg.Set_int(n_iter_optim), "<integer> Set the number of optimisation iterations");
-  ("-test", Arg.Unit (fun () -> test := true), "Show test results");
-  ("-knorm", Arg.Unit(fun () -> knorm_only :=true), "Knormalization only");
-  ("-alpha", Arg.Unit(fun () -> alpha :=true), "Alpha-reduction");
-  ("-let", Arg.Unit(fun () -> let_reduc :=true), "Reduction of nested let-expression");
-  ("-closure", Arg.Unit(fun () -> closure :=true), "Closure conversion");
-  ("-optim", Arg.Unit(fun () -> optim :=true), "test optimisation");
-  ("-back", Arg.Unit(fun () -> back_print :=true), "Back code intermediaire")
+  ("-test-knorm", Arg.Unit(fun () -> test := true; knorm_only :=true), "Knormalization only");
+  ("-test-alpha", Arg.Unit(fun () -> test := true; alpha :=true), "Alpha-reduction");
+  ("-test-let", Arg.Unit(fun () -> test := true; let_reduc :=true), "Reduction of nested let-expression");
+  ("-test-closure", Arg.Unit(fun () -> test := true; closure :=true), "Closure conversion");
+  ("-test-optim", Arg.Unit(fun () -> test := true; optim :=true), "test optimisation");
+  ("-test-back", Arg.Unit(fun () -> test := true; back_print :=true), "Back code intermediaire")
 ]
 
 (* SHOW HELP IN TERM (-h option) *)
@@ -130,9 +129,10 @@ let print_back ast =
   let ast = Knorm.normalize ast in
   let ast = Alpha.conversion ast in
   let ast = iter_optim ast in
+  let ast = Reduction.reduction ast in
   let ast = Closure.closure ast in
   let asml = Asml.generation ast in
-                                            (* Immediate optimisation *)
+  let asml = ImmOptim.optim asml in
   let b = RegAlloc.parcours asml in 
   RegAlloc.print_reg_function b
 
@@ -159,6 +159,7 @@ let print_asml f =
     Typechecker.type_check ast;              (* Typechecking *)
     let ast = Knorm.normalize ast in         (* K-normalization *)
     let ast = Alpha.conversion ast in        (* Alpha-conversion *)
+    let ast = iter_optim ast in              (* Optimizations *)
     let ast = Reduction.reduction ast in     (* Reduction of nested-let *)
     let ast = Closure.closure ast in         (* Closure conversion *)
     let asml = Asml.generation ast in        (* ASML generation *)
