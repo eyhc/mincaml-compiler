@@ -299,7 +299,7 @@ let to_string (a:asml) : string =
   List.fold_left (fun acc s -> acc ^ "\n" ^ (to_string_letdef s)) "" a
 
 
-(* ======== POUR JORANNE ======== *)
+(* ======== POUR JORANE ======== *)
 let string_id (x:id_or_imm) : string =
   match x with
   | Var x -> sprintf "Var (\"%s\")" (Id.to_string x)
@@ -338,19 +338,26 @@ let rec string_exp (e:expr) =
       sprintf "IFFLE ((\"%s\", \"%s\"), %s, %s)" (Id.to_string v) (Id.to_string v2) sa1 sa2
   | CALL (label,args) -> sprintf "CALL (\"%s\", [%s])"
     (Id.to_string label) (Syntax.infix_to_string (fun x -> sprintf "\"%s\"" (Id.to_string x)) args ";")
-  | CALLCLO (label,args) -> "CALLCLO (\"todo\", [])"
-
-and string_asmt (a:asmt) : string =
-  match a with
-  | LET (v, e, a) -> 
-    sprintf "LET (\"%s\", %s, %s)" (Id.to_string v) (string_exp e) (string_asmt a)
-  | EXP e -> sprintf "EXP (%s)" (string_exp e)
-
-let rec string_letdef (l:letdef) : string =
-  match l with
-  | Main asmt -> sprintf "Main (%s)" (string_asmt asmt)
-  | LetFloat(l, f) -> failwith "todo"
-  | LetLabel (l, args, asmt) -> failwith "todo"
-
-let string_struct (a:asml) =
-  sprintf "[%s]" (Syntax.infix_to_string string_letdef a ";")
+  | CALLCLO (label,args) ->
+    sprintf "CALLCLO (\"%s\", [%s])"
+    (Id.to_string label)
+    (Syntax.infix_to_string (fun x -> sprintf "\"%s\"" (Id.to_string x)) args ";")
+  
+  and string_asmt (a:asmt) : string =
+    match a with
+    | LET (v, e, a) -> 
+      sprintf "LET (\"%s\", %s, %s)" (Id.to_string v) (string_exp e) (string_asmt a)
+    | EXP e -> sprintf "EXP (%s)" (string_exp e)
+  
+  let rec string_letdef (l:letdef) : string =
+    match l with
+    | Main asmt -> sprintf "Main (%s)" (string_asmt asmt)
+    | LetFloat f -> sprintf "LetFloat (%f)" f
+    | LetLabel (l, args, asmt) -> 
+      sprintf "LetLabel(\"%s\", [%s], %s)"
+      (Id.to_string l)
+      (Syntax.infix_to_string (fun x -> sprintf "\"%s\"" (Id.to_string x)) args ";")
+      (string_asmt asmt)
+  
+  let string_struct (a:asml) =
+    sprintf "[%s]" (Syntax.infix_to_string string_letdef a ";")
