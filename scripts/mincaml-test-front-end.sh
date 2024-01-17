@@ -56,16 +56,15 @@ do
     fi
     
     old_topic_num=$topic_num; 
-    num_test=$(($num_test+1))
 done
 
 rm -f ${tests_abs}*actual ${tests_abs}*${generate}
 
 echo -e "\n---------- END TESTING ----------"
-echo "Passed tests : $passed/$num_test"
-echo "Failed tests : $failed/$num_test"
+echo "Passed tests : $passed / $((passed + failed))"
+echo "Failed tests : $failed / $((passed + failed))"
 echo -e "-----------------------------------\n"
 
-echo -e "\nFront-end : génération et exécution de l'ASML" >> resultats_tests.txt
-echo "Passed tests : $passed/$num_test" >> resultats_tests.txt
-echo "Failed tests : $failed/$num_test" >> resultats_tests.txt
+echo -e "\n- Front-end : génération et exécution de l'ASML -" >> resultats_tests.txt
+echo "Passed tests : $passed / $((passed + failed))" >> resultats_tests.txt
+echo "Failed tests : $failed / $((passed + failed))" >> resultats_tests.txt

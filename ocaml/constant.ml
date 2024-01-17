@@ -1,17 +1,33 @@
+(*
+constant.ml
+Constant folding
+
+date : 15-01-2023
+*)
 open Knorm
 
+(* types of expression which can be folded *)
 type const = Ent of int | Floatt of float | Tuplet of Id.t list | None 
 
+(* map variables with their value *)
 type exp_map = (Id.t * const) list
 
+(* return the type associated to the variable var, which is in the list/environment env *)
+(* if the var isn't in the environment, returns None *)
 let get_val(env:exp_map) (var:Id.t) : const =
   try snd (List.find (fun (x, y) -> x = var) env)
   with Not_found -> None
 
+(* Main function *)
 let rec constant_folding (env:exp_map) (expr: Knorm.knorm_t) : Knorm.knorm_t =
   match expr with
+  (* return directly the element *)
   | Int i -> Int(i)
   | Float f -> Float(f)
+  | Tuple t -> Tuple(t)
+
+  (* no recursive calls *)
+  (* propagate constants in the operations *)
   | Var(x) -> (match get_val env x with
     | Ent i -> Int(i)
     | Floatt f -> Float(f)
@@ -41,6 +57,8 @@ let rec constant_folding (env:exp_map) (expr: Knorm.knorm_t) : Knorm.knorm_t =
   | FDiv(x, y) -> (match get_val env x, get_val env y with
     | Floatt i1, Floatt i2 -> Float (i1/.i2)
     | _ -> FDiv(x, y))
+  
+    (* with recursive calls *)
   | IfEq((x, y), e1, e2) -> (match get_val env x, get_val env y with
     | Ent i1, Ent i2 -> if i1 = i2 then constant_folding env e1 else constant_folding env e2
     | Floatt i1, Floatt i2 -> if i1 = i2 then constant_folding env e1 else constant_folding env e2
@@ -49,6 +67,12 @@ let rec constant_folding (env:exp_map) (expr: Knorm.knorm_t) : Knorm.knorm_t =
     | Ent i1, Ent i2 -> if i1 <= i2 then constant_folding env e1 else constant_folding env e2
     | Floatt i1, Floatt i2 -> if i1 <= i2 then constant_folding env e1 else constant_folding env e2
     | _ -> IfLE((x, y), constant_folding env e1, constant_folding env e2))
+  | LetRec(fd,e) -> LetRec({name = fd.name; args = fd.args; body = constant_folding env fd.body}, constant_folding env e)
+  | LetTuple(l1, v, e1) -> (match get_val env v with
+    | Tuplet t -> List.fold_left2 (fun e2 l2 x -> constant_folding env (Let(l2, (Var x), e2))) 
+      (constant_folding env e1) l1 t
+    | _ -> LetTuple(l1, v, constant_folding env e1))
+  (* association between a variable and its value added in the environment *)
   | Let((x, t), e1, e2) ->
     let e11 = constant_folding env e1 in
     (match e11 with 
@@ -56,12 +80,8 @@ let rec constant_folding (env:exp_map) (expr: Knorm.knorm_t) : Knorm.knorm_t =
     | Float f -> Let((x,t), e11, constant_folding ((x, Floatt(f))::env) e2)
     | Tuple t2 -> Let((x,t), e11, constant_folding ((x, Tuplet(t2))::env) e2)
     | _ -> Let((x,t), e11, constant_folding env e2))
-  | LetRec(fd,e) -> LetRec({name = fd.name; args = fd.args; body = constant_folding env fd.body}, constant_folding env e)
-  | LetTuple(l1, v, e1) -> (match get_val env v with
-    | Tuplet t -> List.fold_left2 (fun e2 l2 x -> constant_folding env (Let(l2, (Var x), e2))) 
-      (constant_folding env e1) l1 t
-    | _ -> LetTuple(l1, v, constant_folding env e1))
   | _ -> expr
 
+(* Call to main function *)
 let folding (knorm_ast:Knorm.knorm_t) : Knorm.knorm_t =  
   constant_folding [] knorm_ast

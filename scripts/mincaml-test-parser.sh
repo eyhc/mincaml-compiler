@@ -18,19 +18,19 @@ failed=0
 # run all test cases in syntax/valid and make sure they are parsed without error
 # run all test cases in syntax/invalid and make sure the parser returns an error
 
-echo "---------- TESTING PARSER ----------"
+echo -e "------------------ TESTING PARSER ------------------\n"
 for test_case in tests/syntax/valid/*.ml
 do
     file=$(basename $test_case)
     file_name=$(echo $file | cut -d'-' -f2)
 
-    echo -n "    Test on: "$file_name" ..."
+    echo -n "Test on: "$test_case" ..."
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then 
-        echo -e "\r${GREEN} OK${RESET}"
+        echo -e "${GREEN} OK${RESET}"
         passed=$((passed+1))
     else
-        echo -e "\r${RED} KO${RESET}"
+        echo -e "${RED} KO${RESET}"
         failed=$((failed+1))
     fi
 done
@@ -40,23 +40,22 @@ do
     file=$(basename $test_case)
     file_name=$(echo $file | cut -d'-' -f2)
 
-    echo -n "    Test on: "$file_name" ..."
+    echo -n "Test on: "$test_case" ..."
     if $MINCAMLC $OPTION "$test_case" 2> /dev/null 1> /dev/null
     then
-        echo -e "\r${RED} OK${RESET}"
+        echo -e "${GREEN} OK${RESET}"
         failed=$((failed+1))
     else 
-        echo -e "\r${GREEN} KO${RESET}"
+        echo -e "${RED} KO${RESET}"
         passed=$((passed+1))
     fi
 done
 
-echo "---------- END TESTING ----------"
+echo -e "\n---------- END TESTING ----------"
 echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they return KO)"
 echo "Tests failed : $failed / $((passed + failed))"
-echo "-----------------------------------"
+echo -e "-----------------------------------\n"
 echo "RESUME DES TESTS" > resultats_tests.txt
-echo "Parser" >> resultats_tests.txt
+echo "- Parser -" >> resultats_tests.txt
 echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they return KO)" >> resultats_tests.txt
-echo -e "Tests failed : $failed / $((passed + failed))\n" >> resultats_tests.txt
-echo 
+echo -e "Tests failed : $failed / $((passed + failed))" >> resultats_tests.txt

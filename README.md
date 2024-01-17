@@ -34,6 +34,10 @@ Pour compiler vers ARM :
 ocaml/mincamlc test.mml -o test.s
 ```
 
+### Ensemble de tests
+
+Pour lancer l'ensemble des scripts de tests, utiliser simplement `make test` dans le dossier `ocaml/`.
+
 ### Tests avec qemu
 
 ```
