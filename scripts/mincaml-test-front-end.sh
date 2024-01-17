@@ -66,6 +66,6 @@ echo "Passed tests : $passed/$num_test"
 echo "Failed tests : $failed/$num_test"
 echo -e "-----------------------------------\n"
 
-echo -e "\nFront-end : génération et exécution de l'ASML" >> resultats_tests.txt
+echo -e "\n- Front-end : génération et exécution de l'ASML -" >> resultats_tests.txt
 echo "Passed tests : $passed/$num_test" >> resultats_tests.txt
 echo "Failed tests : $failed/$num_test" >> resultats_tests.txt

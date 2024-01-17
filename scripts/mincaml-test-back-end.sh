@@ -46,7 +46,7 @@ do
     expected=$(echo $file_name | cut -d'.' -f1)".expected"
     
 
-    (( topic_num != old_topic_num )) &&  echo && echo -e "\t Iteration $topic_num : ${topics[topic_num]}"
+    (( topic_num != old_topic_num )) &&  echo && echo -e "\t - Iteration $topic_num : ${topics[topic_num]} -"
     
     echo -n "Test on: "$file" ..."
     $MINCAMLC "$test_case" $OPTION "$file_generated"
@@ -74,6 +74,6 @@ echo "Passed tests : $passed/$num_test"
 echo "Failed tests : $failed/$num_test"
 echo -e "-----------------------------------\n"
 
-echo -e "\nBack-end : génération et exécution de l'ARM" >> resultats_tests.txt
+echo -e "\n- Back-end : génération et exécution de l'ARM -" >> resultats_tests.txt
 echo "Passed tests : $passed/$num_test" >> resultats_tests.txt
 echo "Failed tests : $failed/$num_test" >> resultats_tests.txt
