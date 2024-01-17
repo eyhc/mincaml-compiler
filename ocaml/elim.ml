@@ -45,6 +45,8 @@ let predef_with_side_effets: Id.t list = [
 
 (* Main function *)
 let elim_definition (ast:Knorm.knorm_t) : Knorm.knorm_t =
+
+  (* env2 is the list of functions with side effects *)
   let rec elim (a:Knorm.knorm_t) (env:environment) (env2:Id.t list) : Knorm.knorm_t =
     match a with
     | Unit | Int _ | Float _ -> a
