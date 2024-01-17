@@ -11,7 +11,7 @@ let bits (i:int) : int array =
   let rec bits_rec (i:int) (r:int) (a:int array) : unit =
     if r = 0 then ()
     else 
-      let b = i mod 4 and i' = Int.shift_right i 2 in
+      let b = (i+4) mod 4 and i' = Int.shift_right i 2 in
       a.(16-r) <- b ;bits_rec i' (r-1) a
   in
   let a = Array.make 16 0 in 
