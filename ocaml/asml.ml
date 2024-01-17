@@ -352,7 +352,7 @@ let rec string_exp (e:expr) =
   let rec string_letdef (l:letdef) : string =
     match l with
     | Main asmt -> sprintf "Main (%s)" (string_asmt asmt)
-    | LetFloat f -> sprintf "LetFloat (%f)" f
+    | LetFloat(l, f) -> sprintf "LetFloat (%f)" f
     | LetLabel (l, args, asmt) -> 
       sprintf "LetLabel(\"%s\", [%s], %s)"
       (Id.to_string l)
