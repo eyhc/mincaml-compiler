@@ -26,31 +26,33 @@ and reg_function = {
 }
 
 let num_params : int list ref = ref []
-    
+ 
+(* Fonction pour print les hashmap et listes de string *)
 let print_hashtable my_hashtable =
   Hashtbl.iter (fun key value ->
-      Printf.printf "%s -> %s\n" key value  (* Remplacez 'string_of_int' par une conversion appropriée pour votre type 'a' *)
+      Printf.printf "%s -> %s\n" key value
     ) my_hashtable
 
 let print_free my_list =
   List.iter (fun elem ->
-      Printf.printf "%s\n" elem  (* Remplacez '%s' par le format approprié pour le type réel de vos éléments *)
+      Printf.printf "%s\n" elem 
     ) my_list
     
 
-  (* Nombres de registres pour les variables locales *)
+(* Nombres de registres pour les variables locales *)
 let num_registers = 7
-  
-  
-
-  (* parcours_asmt
-  * hashtable binding variable to register,
-  * a : r1 -> variable `a` is in register `r1` 
-*)
+(* Registres *)
 let registers = ["r4";"r5";"r6";"r7";"r8";"r9";"r10"];;
+(* Registres disponible *)
 let reg_available = ref registers;;
+(* Registres pour les parametres des fonctions *)
 let register_param = ["r0";"r1";"r2";"r3"];; 
+(* Registres utilisés pour store les parametres des fonctions *)
 let register_store_param = "r12";;
+
+(*------------------------------ FONCTION AUXILIAIRE -----------------------------*)
+
+(* Supprime un element d'une liste ref *)
 let remove_e_list_ref e = 
   let rec r_lr list =
     match list with
@@ -63,29 +65,22 @@ let remove_e_list_ref e =
   in reg_available := (r_lr !reg_available)
 ;;
 
-let update_reg_available hashmap =
-  reg_available := registers;
-  Hashtbl.iter (fun key value ->
-      remove_e_list_ref value;
-    ) hashmap;
-;; 
-
-
-  (* retourne une list de var qui doivent etre store car presente dans la hashmap mais pas dans la liste active *) 
+(* Retourne une liste de var qui doivent etre store car presente dans la hashmap mais pas dans la liste active *) 
 let var_not_in_list hashmap active =
   let strings_in_list = List.map (fun str -> str) active in
   Hashtbl.fold (fun key value acc -> if not (List.mem key strings_in_list) then (key,value) :: acc else acc) hashmap []
 ;;
   
-  (* retourne une liste des var a mettre dans les registres (load ou let)*)
+(* Retourne une liste des var a mettre dans les registres car presente dans la hashmap mais pas dans active (load ou let)*)
 let var_not_in_hash hashmap active = 
   List.fold_left (fun acc key -> 
       match Hashtbl.find_opt hashmap key with 
-      | Some _ -> acc  (* si la cle est deja  dans la hashmap, ne rien faire *) 
-      | None -> key :: acc  (* sinon, on ajoute la cle a la liste *) 
+      | Some _ -> acc 
+      | None -> key :: acc 
     ) [] active 
 ;; 
   
+(* Remplis les registres au début du main avec les 7 premieres variables utilisées *)
 let fill_var_to_register intervals var_to_register =
   let rec add_hashmap n inter =
     match inter with
@@ -98,7 +93,8 @@ let fill_var_to_register intervals var_to_register =
   in
   add_hashmap 0 !intervals;;
 
-
+(* Retourne true si ladresse est "negatif" : fp - 4
+   false sinon : fp + 4 *)
 let is_pos_adr chaine = 
   if String.length chaine >= 7 then 
     chaine.[6] = '-' 
@@ -106,18 +102,29 @@ let is_pos_adr chaine =
     false 
 ;;
 
-let create_copy_hash var_to_register =
+(* Creer une copie d'une hashmap *)
+let create_copy_hash hashmap =
   let newh = Hashtbl.create 0 in
   Hashtbl.iter (fun key value ->
       Hashtbl.add newh key value; 
-    ) var_to_register; newh
+    ) hashmap; newh
  
+(* Enleve le dernier element d'une liste *)
 let rec enlever_dernier_element liste =
   match List.rev liste with
   | [] -> []
   | _ :: reste -> List.rev reste
 ;;
   
+(* Met a jour les registres disponible en fonction de la hashmap des variables associées aux registres *)
+let update_reg_available var_to_register =
+  reg_available := registers;
+  Hashtbl.iter (fun key value ->
+      remove_e_list_ref value;
+    ) var_to_register;
+;;  
+
+(* Parcours la liste de variable a ajouter dans les registres et load si la var est deja presente dans la pile *)
 let rec active_add act_add bd var_to_register var_in_stack =
   match act_add with
   | hd :: tl -> 
@@ -125,7 +132,6 @@ let rec active_add act_add bd var_to_register var_in_stack =
          update_reg_available var_to_register;
          let r = List.hd !reg_available in
          (try 
-            (*  si la var est presente dans la pile, on load *)
             let value = Hashtbl.find var_in_stack hd in
             bd:= !bd @ [Load (value, Reg r)]; 
           with e -> ()); 
@@ -134,6 +140,10 @@ let rec active_add act_add bd var_to_register var_in_stack =
          active_add tl bd var_to_register var_in_stack)
   | [] -> ()
 
+(* Parcours un asml et donne les 7 prochaines variable utilisées 
+   Cas particulier : 
+    - IFEQ ((s,i_o_s) , asmt1, asmt2) : ne rentre pas dans les asmt 
+    - Functions : les variables qui sont dans r0, r1, r2 et r3 ne seront pas ajoutées a active *)
 let get_intervals_i asml var_to_register list_param= 
   let list = ref [] in
   let rec i_intervals_asmt asmt =
@@ -194,9 +204,9 @@ let get_intervals_i asml var_to_register list_param=
   let l = list in l
 ;; 
 
+(* Recupere une liste de var a ajouter dans les registres et a store, puis parcours la liste de variable a store,
+   a chaque store on ajoute une autre variable a se registres. *)
 let store_load intervals body var_to_register var_in_stack =
-    (* a la premiere ligne hashtable est vide, on y met les 9 variables *)
-      (* sinon, on recupere la liste des var a store *)
   let rec parcours_store list_store active_a_ajouter =
     match list_store with
     | (v,r) ::  tl -> 
@@ -227,7 +237,6 @@ let store_load intervals body var_to_register var_in_stack =
               Hashtbl.add var_to_register var r;
               remove_e_list_ref r;
               (try
-                    (*  si la var est presente dans la pile, on load *)
                  let value = Hashtbl.find var_in_stack var in 
                  body := !body @ [Load (value, Reg r)]; 
                with e -> ());
@@ -241,6 +250,9 @@ let store_load intervals body var_to_register var_in_stack =
   ()
 ;; 
 
+(* Prend en parametre la var_to_registres avant le if et la var_to_registres d'un then ou else,
+   puis on load toutes les variables qui ne sont pas dans la premiere hashmap ou qui ont un registres different afin de 
+   revenir a l'environnement de depart *)
 let load_if var_to_register var_to_register_asmt bd var_in_stack = 
   Hashtbl.iter (fun key value -> 
       try 
@@ -255,6 +267,7 @@ let load_if var_to_register var_to_register_asmt bd var_in_stack =
     ) var_to_register; 
 ;; 
 
+(* Gere les parametres d'une fonction juste au moment d'un call, les trois premiers sont dans r0, r1, r2 et r3 et les autres sont sur la pile *)
 let store_to_regs_params lst bd var_to_register var_in_stack  = 
   let rec store lst count = 
     match lst with 
@@ -295,6 +308,8 @@ let store_to_regs_params lst bd var_to_register var_in_stack  =
   in store lst 0 
 ;; 
 
+(* Initialise var_to_register dans la fonction avec les 4 premiers registres qui contienne les parametres et ajoute dans var_in_stack les autres 
+   parametres avec des adresses positives : fp + 4*)
 let init_var_to_register_func var_to_register var_in_stack list_param =
   let rec parcours_param list count =
     match list with
@@ -313,7 +328,7 @@ let init_var_to_register_func var_to_register var_in_stack list_param =
   parcours_param list_param 0
 ;;
 
-
+(* Parcours l'asml et renvoie une liste de letregdef *)
 let parcours asml =
   let new_body = ref [] in 
   let rec parcours_asmt asmt bd var_to_register var_in_stack list_params =
@@ -452,9 +467,9 @@ let rec print_reg_expr reg_expr =
       Printf.printf "If%s (%s," s s1;
       print_reg_expr ios;
       Printf.printf ") then \n";
-      print_list regt1;
+      print_lists regt1;
       Printf.printf "else \n";
-      print_list regt2;
+      print_lists regt2;
   | Reg s -> Printf.printf  "Reg %s" s
   | Unit -> Printf.printf  "Unit"
 
@@ -481,10 +496,10 @@ and print_reg_function reg_function =
       print_reg_function tl
   | [] -> ()
 
-and print_list l = 
+and print_lists l = 
   match l with 
   | hd :: tl -> 
       print_regt hd;
-      print_list tl
+      print_lists tl
   | [] -> ()
 ;;
