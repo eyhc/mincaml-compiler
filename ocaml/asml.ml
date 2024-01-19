@@ -66,9 +66,9 @@ let call_predef (f:Id.l) (vars:Id.t list) : expr =
   | "truncate" -> CALL ("_min_caml_truncate", vars)
   | _ -> failwith (sprintf "asml generation : %s not a predef function" f)
 
-let floatsdef: letdef list ref = ref [];;
+let floatsdef: letdef list ref = ref []
 
-let funsdef: Closure.fundef list ref = ref [];;
+let funsdef: Closure.fundef list ref = ref []
 
 let get_fdef (name: Id.t): Closure.fundef =
   List.find (fun (x: Closure.fundef) -> fst x.label = name) !funsdef
@@ -204,6 +204,9 @@ and generation_asmt (env: VarSet.t) (a:Closure.t) : asmt =
       let env' = VarSet.add (x, t) env in
       let f = get_fdef l in
       make_closure x (fst f.label) (List.map fst f.frees) (generation_asmt env' e1)
+  | Float f -> 
+    let id = Id.make_unique "x" in
+      generation_float id f (EXP (VAL (Var id)))
   | _ -> EXP (generation_expr env a)
 
 let rec generation_letdef (a:Closure.fundef) : letdef =
