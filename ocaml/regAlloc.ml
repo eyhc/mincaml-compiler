@@ -6,7 +6,7 @@ type reg_expr =
   | Neg of Id.t
   | Add of Id.t * reg_expr
   | Sub of Id.t * reg_expr
-  | Call of Id.l 
+  | Call of Id.l * int
   | If of Id.l * (Id.t*reg_expr) * regt list * regt list
   | Reg of Id.t
   | Unit
@@ -109,14 +109,7 @@ let create_copy_hash hashmap =
   Hashtbl.iter (fun key value ->
       Hashtbl.add newh key value; 
     ) hashmap; newh
- 
-(* Enleve le dernier element d'une liste *)
-let rec enlever_dernier_element liste =
-  match List.rev liste with
-  | [] -> []
-  | _ :: reste -> List.rev reste
-;;
-  
+   
 (* Met a jour les registres disponible en fonction de la hashmap des variables associées aux registres *)
 let update_reg_available var_to_register =
   reg_available := registers;
@@ -212,8 +205,7 @@ let store_load intervals body var_to_register var_in_stack =
     match list_store with
     | (v,r) ::  tl -> 
         if List.exists (fun x -> x = r) register_param then begin 
-          let new_act = enlever_dernier_element active_a_ajouter in
-          parcours_store tl (try (new_act) with Failure tl -> [])
+          parcours_store tl (try (active_a_ajouter) with Failure tl -> [])
         end 
         else 
           (Hashtbl.remove var_to_register v; 
@@ -294,13 +286,13 @@ let store_to_regs_params lst bd var_to_register var_in_stack  =
           begin
             (try 
                let r = Hashtbl.find var_to_register hd in 
-               let adr = "[fp, #-" ^ string_of_int (((Hashtbl.length var_in_stack + (count - 4)) + 1) * 4) ^ "]" in
+               let adr = string_of_int (((Hashtbl.length var_in_stack + (count - 4)) + 1) * 4) in
                bd:= !bd @ [Store ((Reg r), adr)];
                store tl (count + 1)
              with e -> 
                let adr_in_stack = Hashtbl.find var_in_stack hd in 
                bd:= !bd @ [Load (adr_in_stack, (Reg register_store_param))];
-               let adr = "[fp, #-" ^ string_of_int (((Hashtbl.length var_in_stack + (count - 4)) + 1) * 4) ^ "]" in
+               let adr = string_of_int (((Hashtbl.length var_in_stack + (count - 4)) + 1) * 4) in
                bd:= !bd @ [Store ((Reg register_store_param), adr)];
                store tl (count + 1)
             ) 
@@ -321,7 +313,7 @@ let init_var_to_register_func var_to_register var_in_stack list_param =
           parcours_param tl (count + 1)
         end 
         else
-          let adr = "[fp, #" ^ string_of_int (8 + (((List.length list_param - 4) - (count - 3)) * 4)) ^ "]" in
+          let adr = string_of_int (8 + (((List.length list_param - 4) - (count - 3)) * 4)) in
           Hashtbl.add var_in_stack hd adr; 
           parcours_param tl (count + 1)
     | [] -> ()
@@ -369,8 +361,12 @@ let parcours asml =
         Sub (Hashtbl.find var_to_register s, parcours_id_or_im id_or_im var_to_register)
     | NOP -> Unit
     | CALL (s, ls) ->
-        store_to_regs_params ls bd var_to_register var_in_stack ;
-        Call (s) 
+        store_to_regs_params ls bd var_to_register var_in_stack;
+        let first_element = match !num_params with
+                | hd :: _ -> hd
+                | [] -> 0
+              in
+        Call (s, first_element) 
     | IFEQ ((s,i_o_s) , asmt1, asmt2) -> 
         parcours_if "eq" s i_o_s asmt1 asmt2 var_to_register var_in_stack list_params 
     | IFLE ((s,i_o_s) , asmt1, asmt2) -> 
@@ -408,7 +404,7 @@ let parcours asml =
         fill_var_to_register active var_to_register;
         let new_func : reg_function = {
           name = "_start"; 
-          body = !(parcours_asmt hd (ref []) var_to_register var_in_stack []) @ [Exp (Call ("_min_caml_exit"))];
+          body = !(parcours_asmt hd (ref []) var_to_register var_in_stack []) @ [Exp (Call ("_min_caml_exit", 0))];
         } in 
         new_body:= !new_body @ [Fun new_func];
         parcours_asml_list tl 
@@ -416,9 +412,9 @@ let parcours asml =
     | LetLabel (fun_name, list_params, hd) :: tl ->
         let var_to_register = Hashtbl.create 0 in
         let var_in_stack = Hashtbl.create 0 in
+        num_params := (List.length list_params) :: !num_params;
         reg_available := registers ;
         let body_func = ref [] in
-        let temp_loads = ref [] in
         init_var_to_register_func var_to_register var_in_stack list_params;
         
         for i = 0 to min 3 (List.length list_params - 1) do
@@ -429,16 +425,9 @@ let parcours asml =
           Hashtbl.add var_in_stack (List.nth list_params i) param_address;
         done;
         
-        for i = 0 to min 3 (List.length list_params - 1) do
-          let param_reg = "r" ^ string_of_int i in
-          let param_offset = (i + 1) * 4 in
-          let param_address = "-" ^ string_of_int param_offset in
-          temp_loads := [Load (param_address, Reg param_reg)] @ !temp_loads;
-        done;
-        
         let new_func : reg_function = {
           name = fun_name; 
-          body = !(parcours_asmt hd body_func var_to_register var_in_stack list_params) @ !temp_loads;
+          body = !(parcours_asmt hd body_func var_to_register var_in_stack list_params);
         } in 
         new_body := !new_body @ [Fun new_func];
         let temp =
@@ -462,8 +451,8 @@ let rec print_reg_expr reg_expr =
   | Sub (s, expr) -> Printf.printf "(Sub (%s," s ;
       print_reg_expr expr;
       Printf.printf "))";
-  | Call (name) ->
-      Printf.printf "Call(%s)" name 
+  | Call (name, params) ->
+      Printf.printf "Call(%s, %d)" name params
   | If (s,(s1,ios),regt1,regt2) -> 
       Printf.printf "If%s (%s," s s1;
       print_reg_expr ios;

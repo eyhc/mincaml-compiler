@@ -71,13 +71,22 @@ let rec count_lets_in_reg_function : reg_function -> int =
         List.concat (List.map generate_asm_regt true_branch) @
         Printf.sprintf "\tmov %s, r0" s ::
         Printf.sprintf "\t%s:" end_label :: []
-      | Call (func_name) ->
-          [Printf.sprintf "\tpush {r0-r10}"; 
+      | Call (func_name, nb_params) ->
+        let temp_loads = ref [] in
+        for i = 0 to min 3 (nb_params - 1) do
+          let param_reg = "r" ^ string_of_int i in
+          let param_offset = (i + 1) * 4 in
+          let param_address = "-" ^ string_of_int param_offset in
+          temp_loads := !temp_loads @ [Printf.sprintf "\tldr %s, [fp, #%s]" param_reg param_address];
+        done;
+    
+        [ Printf.sprintf "\tpush {r0-r10}";
           Printf.sprintf "\tbl %s" func_name;
           Printf.sprintf "\tmov r12, r0";
           Printf.sprintf "\tpop {r0-r10}";
           Printf.sprintf "\tmov r0, r12";
-          Printf.sprintf "\tmov %s, r0" s;]
+          Printf.sprintf "\tmov %s, r0" s
+        ] @ !temp_loads;      
       | Neg s1 -> [Printf.sprintf "\tneg %s, %s" s s1]
       | Unit -> [Printf.sprintf "\tmov %s, #0" s]
       | _ -> assert false)
@@ -117,10 +126,19 @@ let rec count_lets_in_reg_function : reg_function -> int =
           [Printf.sprintf "\tldr r0, =#%d" n; Printf.sprintf "\tsub r0, %s, r0" s1]
       | Reg reg -> [Printf.sprintf "\tsub r0, %s, %s" s1 reg]
       | _ -> assert false)
-    | Call (func_name) ->
+    | Call (func_name, nb_params) ->
+        let temp_loads = ref [] in
+        for i = 0 to min 3 (nb_params - 1) do
+          let param_reg = "r" ^ string_of_int i in
+          let param_offset = (i + 1) * 4 in
+          let param_address = "-" ^ string_of_int param_offset in
+          temp_loads := !temp_loads @ [Printf.sprintf "\tldr %s, [fp, #%s]" param_reg param_address];
+        done;
+
         [Printf.sprintf "\tpush {r0-r10}";
         Printf.sprintf "\tbl %s" func_name;
         Printf.sprintf "\tpop {r0-r10}"]
+        @ !temp_loads;
     | Neg s1 -> [Printf.sprintf "\tneg r0, %s" s1]
     | Unit -> []
     | _ -> assert false)
