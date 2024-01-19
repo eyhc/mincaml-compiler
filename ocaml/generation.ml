@@ -68,7 +68,8 @@ let rec count_lets_in_reg_function : reg_function -> int =
         Printf.sprintf "\tb %s" end_label ::
         Printf.sprintf "\t%s:" true_label ::
         List.concat (List.map generate_asm_regt true_branch) @
-        Printf.sprintf "\t%s:" end_label :: []
+        Printf.sprintf "\t%s:" end_label ::
+        Printf.sprintf "\tmov %s, r0" s :: []
       
       | If (cmp_type, (r1, Int n), true_branch, false_branch) ->
         let true_label = generate_if_label () in
@@ -79,16 +80,17 @@ let rec count_lets_in_reg_function : reg_function -> int =
           else
             Printf.sprintf "\tldr r12, =%d\n\tcmp %s, r12" n r1
         in
-        [cmp_instruction;
-        Printf.sprintf "\tb%s %s" cmp_type true_label;
-        Printf.sprintf "\tb %s" end_label;
-        Printf.sprintf "\t%s:" true_label] @
+        cmp_instruction ::
+        Printf.sprintf "\tb%s %s" cmp_type true_label ::
+        List.concat (List.map generate_asm_regt false_branch) @
+        Printf.sprintf "\tb %s" end_label ::
+        Printf.sprintf "\t%s:" true_label ::
         List.concat (List.map generate_asm_regt true_branch) @
         Printf.sprintf "\t%s:" end_label ::
-        List.concat (List.map generate_asm_regt false_branch) 
+        Printf.sprintf "\tmov %s, r0" s :: []
       | Call (func_name, nb_params) ->
         let temp_loads = ref [] in
-        for i = 0 to min 3 (nb_params - 1) do
+        for i = 1 to min 4 (nb_params - 1) do
           let param_reg = "r" ^ string_of_int i in
           let param_offset = (i + 1) * 4 in
           let param_address = "-" ^ string_of_int param_offset in
@@ -116,6 +118,7 @@ let rec count_lets_in_reg_function : reg_function -> int =
       Printf.sprintf "\tb %s" end_label ::
       Printf.sprintf "\t%s:" true_label ::
       List.concat (List.map generate_asm_regt true_branch) @
+      Printf.sprintf "\tb %s" end_label ::
       Printf.sprintf "\t%s:" end_label :: []
     
     | If (cmp_type, (r1, Int n), true_branch, false_branch) ->
@@ -127,13 +130,13 @@ let rec count_lets_in_reg_function : reg_function -> int =
         else
           Printf.sprintf "\tldr r12, =%d\n\tcmp %s, r12" n r1
       in
-      [cmp_instruction;
-      Printf.sprintf "\tb%s %s" cmp_type true_label;
-      Printf.sprintf "\tb %s" end_label;
-      Printf.sprintf "\t%s:" true_label] @
+      cmp_instruction ::
+      Printf.sprintf "\tb%s %s" cmp_type true_label ::
+      List.concat (List.map generate_asm_regt false_branch) @
+      Printf.sprintf "\tb %s" end_label ::
+      Printf.sprintf "\t%s:" true_label ::
       List.concat (List.map generate_asm_regt true_branch) @
-      Printf.sprintf "\t%s:" end_label ::
-      List.concat (List.map generate_asm_regt false_branch)  
+      Printf.sprintf "\t%s:" end_label :: [] 
     | Int n ->
       if n <= 255 then
         [Printf.sprintf "\tmov r0, #%d" n]
@@ -160,17 +163,20 @@ let rec count_lets_in_reg_function : reg_function -> int =
       | _ -> assert false)
     | Call (func_name, nb_params) ->
         let temp_loads = ref [] in
-        for i = 0 to min 3 (nb_params - 1) do
+        for i = 1 to min 3 (nb_params - 1) do
           let param_reg = "r" ^ string_of_int i in
           let param_offset = (i + 1) * 4 in
           let param_address = "-" ^ string_of_int param_offset in
           temp_loads := !temp_loads @ [Printf.sprintf "\tldr %s, [fp, #%s]" param_reg param_address];
         done;
 
-        [Printf.sprintf "\tpush {r0-r10}";
-        Printf.sprintf "\tbl %s" func_name;
-        Printf.sprintf "\tpop {r0-r10}"]
-        @ !temp_loads;
+        [ Printf.sprintf "\tpush {r0-r10}";
+          Printf.sprintf "\tbl %s" func_name;
+          Printf.sprintf "\tmov r12, r0";
+          Printf.sprintf "\tpop {r0-r10}";
+          Printf.sprintf "\tmov r0, r12"
+        ] @ !temp_loads;
+
     | Neg s1 -> [Printf.sprintf "\tneg r0, %s" s1]
     | Unit -> []
     | _ -> assert false)

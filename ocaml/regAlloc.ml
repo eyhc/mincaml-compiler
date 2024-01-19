@@ -435,11 +435,10 @@ let parcours asml =
           body = !(parcours_asmt hd body_func var_to_register var_in_stack list_params);
         } in 
         new_body := !new_body @ [Fun new_func];
-        let temp =
-          match !num_params with
-          | _ :: rest ->
-              num_params := rest;
-          | [] -> assert false in  
+        (match !num_params with
+        | _ :: rest ->
+            num_params := rest;
+        | [] -> assert false); 
         parcours_asml_list tl 
     | [] -> !new_body
   in 
