@@ -16,6 +16,7 @@ and regt=
   | Exp of reg_expr
   | Store of reg_expr * Id.t 
   | Load of Id.t * reg_expr 
+  | Push of Id.t
       
 and letregdef = 
   | Fun of reg_function

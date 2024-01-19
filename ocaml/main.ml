@@ -174,6 +174,7 @@ let main (inp:string) (out:string) : unit =
     let ast = Knorm.normalize ast in         (* K-normalization *)
     let ast = Alpha.conversion ast in        (* Alpha-conversion *)
     let ast = iter_optim ast in              (* Optimisations *)
+    let ast = Reduction.reduction ast in 
     let ast = Closure.closure ast in         (* Closure conversion *)
     let asml = Asml.generation ast in        (* ASML generation *)
     let asml = ImmOptim.optim asml in        (* Immediate optimization *)
