@@ -222,7 +222,12 @@ let store_load intervals body var_to_register var_in_stack =
                 | hd :: _ -> hd
                 | [] -> 0
               in
-              let adr = "-" ^ string_of_int ((((Hashtbl.length var_in_stack) - first_element) + 1) * 4) in
+              let adr =
+                if first_element > 4 then
+                  "-" ^ string_of_int ((((Hashtbl.length var_in_stack) - (first_element - 4)) + 1) * 4)
+                else
+                  "-" ^ string_of_int ((((Hashtbl.length var_in_stack) + 1) * 4))
+              in              
               Hashtbl.add var_in_stack v adr;
               body := !body @ [Store ((Reg r), adr)]);
            (try
