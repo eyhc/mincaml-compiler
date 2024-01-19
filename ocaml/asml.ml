@@ -142,7 +142,7 @@ and generation_float (id: Id.t) (f: float) (e1: asmt): asmt =
   let load = LET(id, MEMGET(addr_id, Const(0)), e1) in
   LET(addr_id, LABEL("_"^id), load)
 
-and generation_expr (a:Closure.t) : expr =
+and generation_expr (env: VarSet.t) (a:Closure.t) : expr =
   match a with
   | Unit -> NOP
   | Int i -> VAL (Const i)
@@ -159,9 +159,19 @@ and generation_expr (a:Closure.t) : expr =
   | FDiv (x, y) -> FDIV(x, y)
 
   | IfEq (x, y, at1, at2) -> 
-    IFEQ((x, Var y), generation_asmt at1, generation_asmt at2)
+    (try 
+      let at = snd (List.find (fun (y, z) -> y = x) (VarSet.elements env)) in
+      (match Type.simplify at with
+      | Type.Float -> IFFEQUAL((x, y), generation_asmt env at1, generation_asmt env at2)
+      | _ -> IFEQ((x, Var y), generation_asmt env at1, generation_asmt env at2))
+    with Not_found -> IFEQ((x, Var y), generation_asmt env at1, generation_asmt env at2))
   | IfLE (x, y, at1, at2) ->
-    IFLE((x, Var y), generation_asmt at1, generation_asmt at2)
+    (try 
+      let at = snd (List.find (fun (y, z) -> y = x) (VarSet.elements env)) in
+      (match Type.simplify at with
+      | Type.Float -> IFFLE((x, y), generation_asmt env at1, generation_asmt env at2)
+      | _ -> IFLE((x, Var y), generation_asmt env at1, generation_asmt env at2))
+    with Not_found -> IFLE((x, Var y), generation_asmt env at1, generation_asmt env at2))
     
   | ApplyDir(f, vars) -> if Typechecker.is_prefef_fun f then call_predef f vars else CALL(f, vars)
   | ApplyCls(l, vars) -> CALLCLO(l, vars)
@@ -170,31 +180,31 @@ and generation_expr (a:Closure.t) : expr =
   | Put(a, b, c) -> MEMASSIGN(a, Var(b), c)
   | _ -> printf("%s\n") (Closure.to_string a); assert false
 
-and generation_asmt ?(env: VarSet.t = VarSet.empty) (a:Closure.t) : asmt = 
+and generation_asmt (env: VarSet.t) (a:Closure.t) : asmt = 
   match a with
   | Let ((x, t), e1, e2) -> 
       let env' = VarSet.add (x, t) env in
       (match e1 with
-      | ApplyDir(f, args) -> generation_call x f args (generation_asmt e2)
-      | Tuple(vars) -> generation_tuple x vars (generation_asmt e2)
+      | ApplyDir(f, args) -> generation_call x f args (generation_asmt env' e2)
+      | Tuple(vars) -> generation_tuple x vars (generation_asmt env' e2)
       | Array(size, default) -> 
           let at = snd (List.find (fun (y, z) -> y = default) (VarSet.elements env)) in
-          generation_arraycreate x at size default (generation_asmt ~env:env' e2)
-      | Float(f) -> generation_float x f (generation_asmt ~env:env' e2)
-      | _ -> LET(x, generation_expr e1, generation_asmt ~env:env' e2))
+          generation_arraycreate x at size default (generation_asmt env' e2)
+      | Float(f) -> generation_float x f (generation_asmt env' e2)
+      | _ -> LET(x, generation_expr env' e1, generation_asmt env' e2))
   | LetTuple(vars, tuple, e1) -> 
       let env' = VarSet.union (VarSet.of_list vars) env in
       let rec generate_memget (n: int) (vs: (Id.t * Type.t) list): asmt =
         match vs with
-        | [(x, y)] -> LET(x, MEMGET(tuple, Const(n)), (generation_asmt ~env:env' e1))
+        | [(x, y)] -> LET(x, MEMGET(tuple, Const(n)), (generation_asmt env' e1))
         | (x, y) :: tail -> LET(x, MEMGET(tuple, Const(n)), generate_memget (n+4) tail)
         | _ -> assert false
       in generate_memget 0 vars
   | MakeCls((x, t), l, args, e1) -> 
       let env' = VarSet.add (x, t) env in
       let f = get_fdef l in
-      make_closure x (fst f.label) (List.map fst f.frees) (generation_asmt ~env:env' e1)
-  | _ -> EXP (generation_expr a)
+      make_closure x (fst f.label) (List.map fst f.frees) (generation_asmt env' e1)
+  | _ -> EXP (generation_expr env a)
 
 let rec generation_letdef (a:Closure.fundef) : letdef =
   (* Ajoute le chargement des variables libres de la fonction au début du code de celle-ci *)
@@ -204,7 +214,9 @@ let rec generation_letdef (a:Closure.fundef) : letdef =
     | [x] -> LET(x, MEMGET("%self", Const(n)), code)
     | x :: tail -> LET(x, MEMGET("%self", Const(n)), add_load_frees (n+4) tail code)
   in
-  LetLabel (fst a.label, List.map fst a.args, add_load_frees 4 (List.map fst a.frees) (generation_asmt a.code))
+  LetLabel (fst a.label, 
+    List.map fst a.args, add_load_frees 4 (List.map fst a.frees) (generation_asmt VarSet.empty a.code)
+  )
 
 (* 
 Génère le code asml équivalent au programme en paramètre
@@ -218,7 +230,7 @@ let rec generation (ast:Closure.t) : asml =
     floatsdef := [];
     funsdef := fcts;
     let funs = List.map generation_letdef fcts in
-    let main = Main(generation_asmt main) in
+    let main = Main(generation_asmt VarSet.empty main) in
     !floatsdef @ funs @ [main]
   | _ -> failwith "Not correct closure form" 
 

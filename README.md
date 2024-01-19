@@ -51,34 +51,31 @@ On explique ici comment utiliser l'option `-test`:
 
 ```sh
 # afficher le résultat de la knormalisation
-ocaml/mincamlc -test -knorm test.mml
-# notons que l'ordre importe peu
-ocaml/mincamlc -test test.mml -knorm
-ocaml/mincamlc test.mm -test -knorm
+ocaml/mincamlc -test-knorm test.mml
 
 # afficher le résultat de la knorm et de l'apha-conversion
-ocaml/mincamlc -test -alpha test.mml
+ocaml/mincamlc -test-alpha test.mml
 
 # afficher le résultat après un tour d'optimisation
-ocaml/mincamlc -test -optim test.mml
+ocaml/mincamlc -test-optim test.mml
 
 # afficher le résultat après :
 #  - k-normalisation
 #  - alpha conversion
 #  - let reduction
-ocaml/mincamlc -test -let test.mml
+ocaml/mincamlc -test-let test.mml
 
 # afficher le résultat après :
 #  - k-normalisation
 #  - alpha conversion
 #  - let reduction
 #  - closure conversion
-ocaml/mincamlc -test -closure test.mml
+ocaml/mincamlc -test-closure test.mml
 
 # afficher le résultat après :
 #  - asml conversion
 #  - register allocation
-ocaml/mincamlc -test -back test.mml
+ocaml/mincamlc -test-back test.mml
 ```
 
 
