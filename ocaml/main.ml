@@ -2,7 +2,7 @@
 
 (* version *)
 let show_version () =
-  print_endline "MinCamlCompiler v0.1.11 - 11-01-2023";
+  print_endline "MinCamlCompiler v0.2.1 - 19-01-2023";
   exit 0
 
 (* Global variables for Arg's parser *)
@@ -32,6 +32,7 @@ let speclist = [
   ("-asml", Arg.Unit (fun () -> asml_only := true), "Print asml");
   ("-p", Arg.Unit (fun () -> parse_only := true), "Parse only");
   ("-n_iter", Arg.Set_int(n_iter_optim), "<integer> Set the number of optimisation iterations");
+  ("-inline_deep", Arg.Set_int(Inline.max_deep), "<i> Set the max_deep of inline expansion");
   ("-test-knorm", Arg.Unit(fun () -> test := true; knorm_only :=true), "Knormalization only");
   ("-test-alpha", Arg.Unit(fun () -> test := true; alpha :=true), "Alpha-reduction");
   ("-test-let", Arg.Unit(fun () -> test := true; let_reduc :=true), "Reduction of nested let-expression");
@@ -44,7 +45,6 @@ let speclist = [
 let show_help r =
   Arg.usage speclist usage_msg;
   exit r
-
 
 
 (*********************
@@ -128,7 +128,6 @@ let print_back ast =
   Typechecker.type_check ast;
   let ast = Knorm.normalize ast in
   let ast = Alpha.conversion ast in
-  let ast = iter_optim ast in
   let ast = Reduction.reduction ast in
   let ast = Closure.closure ast in
   let asml = Asml.generation ast in

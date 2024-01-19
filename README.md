@@ -31,7 +31,21 @@ ocaml/mincamlc test.mml -asml
 
 Pour compiler vers ARM :
 ```sh
-ocaml/mincamlc test.mml -o test.s
+ocaml/mincamlc test.mml -o test.s 
+```
+
+### Configuration des Optimisations
+
+Pour fixer le nombre de fois où on applique les optimisations (défaut 500).
+Par exemple :
+```sh
+ocaml/mincamlc test.mml -o test.s -n_iter 1000
+```
+
+Pour fixer la taille maximale des fonctions dont le code est substitué par l'inline expansion (défaut 10).
+Par exemple :
+```sh
+ocaml/mincamlc test.mml -o test.s -n_iter 1000
 ```
 
 ### Ensemble de tests
@@ -50,10 +64,10 @@ make test
 On explique ici comment utiliser l'option `-test`:
 
 ```sh
-# afficher le résultat de la knormalisation
+# afficher le résultat de la k-normalisation
 ocaml/mincamlc -test-knorm test.mml
 
-# afficher le résultat de la knorm et de l'apha-conversion
+# afficher le résultat de la k-normalisation et de l'alpha-conversion
 ocaml/mincamlc -test-alpha test.mml
 
 # afficher le résultat après un tour d'optimisation
@@ -61,14 +75,14 @@ ocaml/mincamlc -test-optim test.mml
 
 # afficher le résultat après :
 #  - k-normalisation
-#  - alpha conversion
-#  - let reduction
+#  - alpha-conversion
+#  - let-reduction
 ocaml/mincamlc -test-let test.mml
 
 # afficher le résultat après :
 #  - k-normalisation
 #  - alpha conversion
-#  - let reduction
+#  - let-reduction
 #  - closure conversion
 ocaml/mincamlc -test-closure test.mml
 
