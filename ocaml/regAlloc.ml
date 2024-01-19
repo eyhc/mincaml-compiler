@@ -296,15 +296,13 @@ let store_to_regs_params lst bd var_to_register var_in_stack  =
           begin
             (try 
                let r = Hashtbl.find var_to_register hd in 
-               let adr = string_of_int (((Hashtbl.length var_in_stack + (count - 4)) + 1) * 4) in
-               bd:= !bd @ [Store ((Reg r), adr)];
+               bd:= !bd @ [Push  (r)];
                store tl (count + 1)
              with e -> 
-               let adr_in_stack = Hashtbl.find var_in_stack hd in 
-               bd:= !bd @ [Load (adr_in_stack, (Reg register_store_param))];
-               let adr = string_of_int (((Hashtbl.length var_in_stack + (count - 4)) + 1) * 4) in
-               bd:= !bd @ [Store ((Reg register_store_param), adr)];
-               store tl (count + 1)
+                let adr_in_stack = Hashtbl.find var_in_stack hd in 
+                bd:= !bd @ [Load (adr_in_stack, (Reg register_store_param))];
+                bd:= !bd @ [Push  (register_store_param)];
+                store tl (count + 1) 
             ) 
           end 
     | [] -> ()
@@ -323,7 +321,7 @@ let init_var_to_register_func var_to_register var_in_stack list_param =
           parcours_param tl (count + 1)
         end 
         else
-          let adr = string_of_int (8 + (((List.length list_param - 4) - (count - 3)) * 4)) in
+          let adr = string_of_int (8 + (7 * 4) + (((List.length list_param - 4) - (count - 3)) * 4)) in
           Hashtbl.add var_in_stack hd adr; 
           parcours_param tl (count + 1)
     | [] -> ()

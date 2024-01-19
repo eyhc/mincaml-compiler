@@ -7,6 +7,8 @@ let floats : string list ref = ref []
 let if_label_counter = ref 0
 let num_label_counter = ref 0
 
+let sp_values : int list ref = ref []
+
 let generate_if_label () =
   let label = "l" ^ string_of_int !if_label_counter in
   if_label_counter := !if_label_counter + 1;
@@ -25,11 +27,17 @@ let rec generate_asm_regt : regt -> string list = function
         [Printf.sprintf "\tmov %s, #%d" s n]
       else
         [Printf.sprintf "\tldr %s, =#%d" s n]
-    | Reg reg -> [Printf.sprintf "\tmov %s, %s" s reg]
+    | Reg reg ->
+      if s = reg then
+        []
+      else
+        [Printf.sprintf "\tmov %s, %s" s reg]
     | Add (s1, expr) ->
       (match expr with
       | Int n -> 
-        if n <= 255 then
+        if s = s1 && n = 0 then
+          []
+        else if n <= 255 then
           [Printf.sprintf "\tadd %s, %s, #%d" s s1 n]
         else
           [Printf.sprintf "\tldr r12, =#%d" n; Printf.sprintf "\tadd %s, %s, r12" s s1]
@@ -38,7 +46,9 @@ let rec generate_asm_regt : regt -> string list = function
     | Sub (s1, expr) ->
       (match expr with
       | Int n -> 
-        if n <= 255 then
+        if s = s1 && n = 0 then
+          []
+        else if n <= 255 then
           [Printf.sprintf "\tsub %s, %s, #%d" s s1 n]
         else
           [Printf.sprintf "\tldr r12, =#%d" n; Printf.sprintf "\tsub %s, %s, r12" s s1]
@@ -74,12 +84,39 @@ let rec generate_asm_regt : regt -> string list = function
       Printf.sprintf "\t%s:" end_label ::
       Printf.sprintf "\tmov %s, r0" s :: []
     | Call (func_name, nb_params) ->
-      [Printf.sprintf "\tpush {r0-r10}";
+
+      let first_element = match !sp_values with
+      | hd :: _ -> hd
+      | [] -> -1 in
+
+      if first_element = -1 then
+          assert false;
+
+
+      let temp_loads = ref [] in
+      for i = 0 to min 4 (nb_params - 1) do
+        let param_reg = "r" ^ string_of_int i in
+        let param_offset = (i + 1) * 4 in
+        let param_address = "-" ^ string_of_int param_offset in
+        temp_loads := !temp_loads @ [Printf.sprintf "\tldr %s, [fp, #%s]" param_reg param_address];
+      done;
+
+      let instructions =
+        if first_element < 255 then
+          [Printf.sprintf "\tsub sp, fp, #%d" first_element]
+        else
+          let label = generate_num_label () in
+          consts := !consts @ [label ^ ": .word " ^ string_of_int (first_element * 4) ^ "\n"];
+          ["\tldr r12, " ^ label;
+           "\tsub sp, fp, r12"] in
+  
+      [ Printf.sprintf "\tpush {r4-r10}";
         Printf.sprintf "\tbl %s" func_name;
         Printf.sprintf "\tmov r12, r0";
-        Printf.sprintf "\tpop {r0-r10}";
-        Printf.sprintf "\tmov r0, r12";
-        Printf.sprintf "\tmov %s, r0" s]   
+        Printf.sprintf "\tpop {r4-r10}"] @ instructions @
+      [ Printf.sprintf "\tmov r0, r12";
+        Printf.sprintf "\tmov %s, r0" s
+      ] @ !temp_loads;
     | Neg s1 -> [Printf.sprintf "\tneg %s, %s" s s1]
     | Unit -> [Printf.sprintf "\tmov %s, #0" s]
     | _ -> assert false)
@@ -118,7 +155,11 @@ let rec generate_asm_regt : regt -> string list = function
       [Printf.sprintf "\tmov r0, #%d" n]
     else
       [Printf.sprintf "\tldr r0, =#%d" n]      
-  | Reg reg -> [Printf.sprintf "\tmov r0, %s" reg]
+  | Reg reg ->
+    if reg = "r0" then
+      []
+    else
+      [Printf.sprintf "\tmov r0, %s" reg]
   | Add (s1, expr) ->
     (match expr with
     | Int n -> 
@@ -137,12 +178,38 @@ let rec generate_asm_regt : regt -> string list = function
         [Printf.sprintf "\tldr r0, =#%d" n; Printf.sprintf "\tsub r0, %s, r0" s1]
     | Reg reg -> [Printf.sprintf "\tsub r0, %s, %s" s1 reg]
     | _ -> assert false)
-  | Call (func_name, nb_params) ->
-      [Printf.sprintf "\tpush {r0-r10}";
+    | Call (func_name, nb_params) ->
+
+      let first_element = match !sp_values with
+          | hd :: _ -> hd
+          | [] -> -1 in
+  
+        if first_element = -1 then
+            assert false;
+
+      let temp_loads = ref [] in
+      for i = 1 to min 3 (nb_params - 1) do
+        let param_reg = "r" ^ string_of_int i in
+        let param_offset = (i + 1) * 4 in
+        let param_address = "-" ^ string_of_int param_offset in
+        temp_loads := !temp_loads @ [Printf.sprintf "\tldr %s, [fp, #%s]" param_reg param_address];
+      done;
+
+      let instructions =
+        if first_element < 255 then
+          [Printf.sprintf "\tsub sp, fp, #%d" first_element]
+        else
+          let label = generate_num_label () in
+          consts := !consts @ [label ^ ": .word " ^ string_of_int (first_element * 4) ^ "\n"];
+          ["\tldr r12, " ^ label;
+           "\tsub sp, fp, r12"] in
+
+      [ Printf.sprintf "\tpush {r4-r10}";
         Printf.sprintf "\tbl %s" func_name;
         Printf.sprintf "\tmov r12, r0";
-        Printf.sprintf "\tpop {r0-r10}";
-        Printf.sprintf "\tmov r0, r12"]
+        Printf.sprintf "\tpop {r4-r10}"] @ instructions @
+      [ Printf.sprintf "\tmov r0, r12"] @ !temp_loads;
+
   | Neg s1 -> [Printf.sprintf "\tneg r0, %s" s1]
   | Unit -> []
   | _ -> assert false)
@@ -181,6 +248,8 @@ and generate_asm_fun_internal : reg_function -> string list = fun { name; body }
   in
   let size = abs min_negative_size in
 
+  sp_values := size :: !sp_values;
+
   [Printf.sprintf "%s:" name]
   @ generate_prologue size
   @ List.concat (List.map generate_asm_regt body)
@@ -196,7 +265,13 @@ and generate_prologue size =
                 "\tsub sp, fp, sp"]
   
 and generate_epilogue =
-  ["\tadd sp, fp, #0"; "\tpop {fp, lr}"; "\tbx lr\n"]
+  match !sp_values with
+  | _ :: rest ->
+    sp_values := rest;
+    ["\tadd sp, fp, #0"; "\tpop {fp, lr}"; "\tbx lr\n"]
+  | [] ->
+    ["\tadd sp, fp, #0"; "\tpop {fp, lr}"; "\tbx lr\n"]
+
 
 let generate_asm_reg (defs: letregdef list) : string list =
   match defs with
