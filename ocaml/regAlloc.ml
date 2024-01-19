@@ -488,6 +488,7 @@ and print_regt  regt =
   | Load (s, expr) -> Printf.printf " (Load (%s," s;
       print_reg_expr expr;
       Printf.printf ")) "
+  | Push (s) -> Printf.printf " (Push (%s))" s;
   
 and print_reg_function reg_function =
   match reg_function with 
