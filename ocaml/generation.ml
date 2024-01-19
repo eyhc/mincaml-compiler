@@ -65,12 +65,27 @@ let rec count_lets_in_reg_function : reg_function -> int =
         Printf.sprintf "\tcmp %s, %s" r1 r2 ::
         Printf.sprintf "\tb%s %s" cmp_type true_label ::
         List.concat (List.map generate_asm_regt false_branch) @
-        Printf.sprintf "\tmov %s, r0" s ::
         Printf.sprintf "\tb %s" end_label ::
         Printf.sprintf "\t%s:" true_label ::
         List.concat (List.map generate_asm_regt true_branch) @
-        Printf.sprintf "\tmov %s, r0" s ::
         Printf.sprintf "\t%s:" end_label :: []
+      
+      | If (cmp_type, (r1, Int n), true_branch, false_branch) ->
+        let true_label = generate_if_label () in
+        let end_label = generate_if_label () in
+        let cmp_instruction =
+          if n <= 255 then
+            Printf.sprintf "\tcmp %s, #%d" r1 n
+          else
+            Printf.sprintf "\tldr r12, =%d\n\tcmp %s, r12" n r1
+        in
+        [cmp_instruction;
+        Printf.sprintf "\tb%s %s" cmp_type true_label;
+        Printf.sprintf "\tb %s" end_label;
+        Printf.sprintf "\t%s:" true_label] @
+        List.concat (List.map generate_asm_regt true_branch) @
+        Printf.sprintf "\t%s:" end_label ::
+        List.concat (List.map generate_asm_regt false_branch) 
       | Call (func_name, nb_params) ->
         let temp_loads = ref [] in
         for i = 0 to min 3 (nb_params - 1) do
@@ -102,6 +117,23 @@ let rec count_lets_in_reg_function : reg_function -> int =
       Printf.sprintf "\t%s:" true_label ::
       List.concat (List.map generate_asm_regt true_branch) @
       Printf.sprintf "\t%s:" end_label :: []
+    
+    | If (cmp_type, (r1, Int n), true_branch, false_branch) ->
+      let true_label = generate_if_label () in
+      let end_label = generate_if_label () in
+      let cmp_instruction =
+        if n <= 255 then
+          Printf.sprintf "\tcmp %s, #%d" r1 n
+        else
+          Printf.sprintf "\tldr r12, =%d\n\tcmp %s, r12" n r1
+      in
+      [cmp_instruction;
+      Printf.sprintf "\tb%s %s" cmp_type true_label;
+      Printf.sprintf "\tb %s" end_label;
+      Printf.sprintf "\t%s:" true_label] @
+      List.concat (List.map generate_asm_regt true_branch) @
+      Printf.sprintf "\t%s:" end_label ::
+      List.concat (List.map generate_asm_regt false_branch)  
     | Int n ->
       if n <= 255 then
         [Printf.sprintf "\tmov r0, #%d" n]
