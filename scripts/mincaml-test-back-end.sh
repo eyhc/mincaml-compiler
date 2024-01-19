@@ -8,6 +8,8 @@ COMPILEOPT=-mfpu=fpv5-d16
 libmincaml=ARM/libmincaml.S
 EXEC=qemu-arm
 OPTION=-o
+OPTION_OPTIM=-n_iter
+NUM_OPTIM=0
 tests="tests/gen-code/"
 tests_abs=$(pwd)/"${tests}"
 generate=".s"
@@ -49,7 +51,7 @@ do
     (( topic_num != old_topic_num )) &&  echo && echo -e "\t - Iteration $topic_num : ${topics[topic_num]} -"
     
     echo -n "Test on: "$file" ..."
-    $MINCAMLC "$test_case" $OPTION "$file_generated"
+    $MINCAMLC $OPTION_OPTIM $NUM_OPTIM "$test_case" $OPTION "$file_generated"
     $COMPILE_AS $COMPILEOPT "$file_generated" "$libmincaml" $OPTION "$object_file"
     $COMPILE_LD "$object_file" $OPTION "$arm_file"
     echo $($EXEC "$arm_file") 2> "$result" 1> "$result"
