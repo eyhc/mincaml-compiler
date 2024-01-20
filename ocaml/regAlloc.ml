@@ -10,7 +10,7 @@ type reg_expr =
   | CallClo of Id.l * int
   | If of Id.l * (Id.t*reg_expr) * regt list * regt list
   | Reg of Id.t
-  | MemAssign of Id.t 
+  | MemGet of Id.t * Id.t
   | Adresse of Id.t
   | Label of Id.t
   | Unit
@@ -29,6 +29,7 @@ and reg_function = {
   name : Id.l;
   body : regt list
 }
+
 let num_params : int list ref = ref []
   
 
@@ -353,21 +354,25 @@ let parcours asml =
         let r = Hashtbl.find var_to_register var1 in
         Hashtbl.remove var_to_register var1;
         reg_available := !reg_available @ [r];
-        
+        let adr = calcul_adr var_in_stack list_params in
+        let r_var = Hashtbl.find var_to_register var in
+        Hashtbl.add var_in_stack var adr;
+        bd := !bd @ [Store (Reg r_var, adr)];
         parcours_asmt exp bd var_to_register var_in_stack list_params;
+    | LET (var1, MEMGET (var, Const n), exp) ->
+        let active = get_intervals_i asmt var_to_register list_params in
+        store_load active bd var_to_register var_in_stack list_params;
+        let r = Hashtbl.find var_to_register var1 in
+        let r_var = Hashtbl.find var_to_register var in
+        let offset = "-" ^ string_of_int (n)  in
+        bd := !bd @ [Let (r, MemGet (r_var, offset))];
+        parcours_asmt exp bd var_to_register var_in_stack list_params; 
     | LET (var1, var2, exp) ->
         let active = get_intervals_i asmt var_to_register list_params in
         store_load active bd var_to_register var_in_stack list_params;
         let r = Hashtbl.find var_to_register var1 in
 
-        (match var2 with
-           (*| MEMGET (var, Const n) ->
-             let adr = (Hashtbl.find var_in_stack var) + 4 + n in
-             let reg = Hashtbl.find var_to_register
-         
-         | MEMASSIGN (tuple, _, var) ->
-         *)    
-             (*MemAssign (r) *)
+        (match var2 with 
          | NEW i_o_s ->
              let adr = calcul_adr var_in_stack list_params in
              let next_adr = (int_of_string adr) - 4 in

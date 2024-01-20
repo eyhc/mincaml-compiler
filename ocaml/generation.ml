@@ -151,7 +151,12 @@ let rec generate_asm_regt : regt -> string list = function
       [ Printf.sprintf "\tmov r0, r12";
         Printf.sprintf "\tmov %s, r0" s
       ] @ !temp_loads;
-    | Adresse a -> [Printf.sprintf "\tldr %s, [fp, #%s]" s a]
+    | Adresse a -> 
+      if abs(int_of_string a) <= 255 then
+        [Printf.sprintf "\tadd %s, fp, #%s" s a]
+      else
+        [Printf.sprintf "\tldr r12, =#%s" a; Printf.sprintf "\tadd %s, fp, r12" s]
+    | MemGet (s1, adr) -> [Printf.sprintf "\tldr %s, [%s, #%s]" s s1 adr]
     | Label l -> [Printf.sprintf "\tldr %s, =%s" s l]
     | Neg s1 -> [Printf.sprintf "\tneg %s, %s" s s1]
     | Unit -> [Printf.sprintf "\tmov %s, #0" s]
