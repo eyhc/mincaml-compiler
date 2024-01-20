@@ -102,7 +102,7 @@ let rec generate_asm_regt : regt -> string list = function
       done;
 
       let instructions =
-        if first_element < 255 then
+        if first_element <= 255 then
           [Printf.sprintf "\tsub sp, fp, #%d" first_element]
         else
           let label = generate_num_label () in
@@ -131,7 +131,6 @@ let rec generate_asm_regt : regt -> string list = function
     Printf.sprintf "\tb %s" end_label ::
     Printf.sprintf "\t%s:" true_label ::
     List.concat (List.map generate_asm_regt true_branch) @
-    Printf.sprintf "\tb %s" end_label ::
     Printf.sprintf "\t%s:" end_label :: []
   
   | If (cmp_type, (r1, Int n), true_branch, false_branch) ->
