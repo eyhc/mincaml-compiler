@@ -312,7 +312,7 @@ let rec string_exp (e:expr) =
   | FDIV (v1,v2) -> sprintf "FDIV (\"%s\", %s)" (Id.to_string v1) (Id.to_string v2)
   | NEW v -> sprintf "NEW (%s)" (string_id v)
   | MEMGET (v1,v2) -> sprintf "MEMGET (\"%s\", %s)" (Id.to_string v1) (string_id v2)
-  | MEMASSIGN (v1,v2,v3) -> sprintf "(MEMASSIGN (\"%s\", %s, \"%s\")" v1 (string_id v2) v3
+  | MEMASSIGN (v1,v2,v3) -> sprintf "(MEMASSIGN (\"%s\", %s, \"%s\"))" v1 (string_id v2) v3
   | IFEQ ((v, vd), a1, a2) ->
     let sa1 = string_asmt a1 and sa2 = string_asmt a2 in
       sprintf "IFEQ ((\"%s\", %s), %s, %s)" (Id.to_string v) (string_id vd) sa1 sa2
@@ -338,15 +338,15 @@ let rec string_exp (e:expr) =
   and string_asmt (a:asmt) : string =
     match a with
     | LET (v, e, a) -> 
-      sprintf "LET (\"%s\", %s, %s)" (Id.to_string v) (string_exp e) (string_asmt a)
-    | EXP e -> sprintf "EXP (%s)" (string_exp e)
+      sprintf "\nLET (\"%s\", %s, %s)" (Id.to_string v) (string_exp e) (string_asmt a)
+    | EXP e -> sprintf "\nEXP (%s)" (string_exp e)
   
   let rec string_letdef (l:letdef) : string =
     match l with
-    | Main asmt -> sprintf "Main (%s)" (string_asmt asmt)
-    | LetFloat(l, f) -> sprintf "LetFloat (%f)" f
+    | Main asmt -> sprintf "\nMain (%s)" (string_asmt asmt)
+    | LetFloat(l, f) -> sprintf "\nLetFloat (%f)" f
     | LetLabel (l, args, asmt) -> 
-      sprintf "LetLabel(\"%s\", [%s], %s)"
+      sprintf "\nLetLabel(\"%s\", [%s], %s)"
       (Id.to_string l)
       (Syntax.infix_to_string (fun x -> sprintf "\"%s\"" (Id.to_string x)) args ";")
       (string_asmt asmt)
