@@ -7,6 +7,7 @@ type reg_expr =
   | Add of Id.t * reg_expr
   | Sub of Id.t * reg_expr
   | Call of Id.l * int
+  | CallClo of Id.l * int
   | If of Id.l * (Id.t*reg_expr) * regt list * regt list
   | Reg of Id.t
   | MemAssign of Id.t 
@@ -347,7 +348,6 @@ let parcours asml =
   let rec parcours_asmt asmt bd var_to_register var_in_stack list_params =
     match asmt with
     | LET (var1, (MEMASSIGN (tuple, _, var)), exp) ->
-        Printf.printf "Let ( %s, MEMASSIGN( _, _, %s) )\n " var1 var;
         let active = get_intervals_i asmt var_to_register list_params in
         store_load active bd var_to_register var_in_stack list_params;
         let r = Hashtbl.find var_to_register var1 in
@@ -356,7 +356,6 @@ let parcours asml =
         
         parcours_asmt exp bd var_to_register var_in_stack list_params;
     | LET (var1, var2, exp) ->
-        Printf.printf "LET %s\n" var1;
         let active = get_intervals_i asmt var_to_register list_params in
         store_load active bd var_to_register var_in_stack list_params;
         let r = Hashtbl.find var_to_register var1 in
