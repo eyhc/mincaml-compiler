@@ -28,22 +28,8 @@ and reg_function = {
   name : Id.l;
   body : regt list
 }
-
 let num_params : int list ref = ref []
-    
-let remove_quatre_premiers_elem list_params = 
-  let rec fonc lst count = 
-    match lst with 
-    | e :: ll -> 
-        if count > 3 then 
-          e :: fonc ll (count + 1)
-        else
-          fonc ll (count + 1)
-    | [] -> []
-  in 
-  fonc list_params 0
-;;
-
+  
 
 (* Fonction pour print les hashmap et listes de string *)
 let print_hashtable my_hashtable =
@@ -69,6 +55,19 @@ let register_param = ["r0";"r1";"r2";"r3"];;
 let register_store_param = "r12";;
 
 (*------------------------------ FONCTION AUXILIAIRE -----------------------------*)
+let quatre_premiers_elem list_params = 
+  let rec fonc lst count = 
+    match lst with 
+    | e :: ll -> 
+        if count <= 3 then 
+          e :: fonc ll (count + 1)
+        else
+          []
+    | [] -> []
+  in 
+  fonc list_params 0
+;;
+
 
 let calcul_adr var_in_stack list_params =
 (* Retourne len(param) - 4 ou 0 si negatif *)
@@ -179,7 +178,7 @@ let get_intervals_i asml var_to_register list_param=
 
   and i_intervals_string var =
     if not ((List.length !list) = num_registers) then begin
-      if not (List.exists (fun v -> v = var) !list) && not (List.exists (fun v -> v = var) list_param)then
+      if not (List.exists (fun v -> v = var) !list) && not (List.exists (fun v -> v = var) (quatre_premiers_elem list_param))then
         list := !list @ [var];
     end
   and i_intervals_id_or_imm id_or_im =
@@ -357,6 +356,7 @@ let parcours asml =
         
         parcours_asmt exp bd var_to_register var_in_stack list_params;
     | LET (var1, var2, exp) ->
+        Printf.printf "LET %s\n" var1;
         let active = get_intervals_i asmt var_to_register list_params in
         store_load active bd var_to_register var_in_stack list_params;
         let r = Hashtbl.find var_to_register var1 in
@@ -478,7 +478,7 @@ let parcours asml =
 
         let new_func : reg_function = {
           name = fun_name;
-          body = !(parcours_asmt hd body_func var_to_register var_in_stack (remove_quatre_premiers_elem list_params));
+          body = !(parcours_asmt hd body_func var_to_register var_in_stack list_params);
         } in
         new_body := !new_body @ [Fun new_func];
         (match !num_params with
