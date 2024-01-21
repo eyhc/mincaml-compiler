@@ -9,6 +9,8 @@ let num_label_counter = ref 0
 
 let sp_values : int list ref = ref []
 
+let pushed_vars : int ref = ref 0
+
 let generate_if_label () =
   let label = "l" ^ string_of_int !if_label_counter in
   if_label_counter := !if_label_counter + 1;
@@ -92,7 +94,6 @@ let rec generate_asm_regt : regt -> string list = function
       if first_element = -1 then
           assert false;
 
-
       let temp_loads = ref [] in
       for i = 0 to min 4 (nb_params - 1) do
         let param_reg = "r" ^ string_of_int i in
@@ -102,21 +103,27 @@ let rec generate_asm_regt : regt -> string list = function
       done;
 
       let instructions =
-        if first_element <= 255 then
-          [Printf.sprintf "\tsub sp, fp, #%d" first_element]
+        if !pushed_vars = 1 then
+          begin
+            pushed_vars := 0;
+            if first_element < 255 then
+              [Printf.sprintf "\tsub sp, fp, #%d" first_element]
+            else
+              let label = generate_num_label () in
+              consts := !consts @ [label ^ ": .word " ^ string_of_int (first_element * 4) ^ "\n"];
+              ["\tldr r12, " ^ label;
+               "\tsub sp, fp, r12"]
+          end
         else
-          let label = generate_num_label () in
-          consts := !consts @ [label ^ ": .word " ^ string_of_int (first_element * 4) ^ "\n"];
-          ["\tldr r12, " ^ label;
-           "\tsub sp, fp, r12"] in
-  
+          [] 
+      in     
+        
       [ Printf.sprintf "\tpush {r4-r10}";
         Printf.sprintf "\tbl %s" func_name;
-        Printf.sprintf "\tmov r12, r0";
-        Printf.sprintf "\tpop {r4-r10}"] @ instructions @
-      [ Printf.sprintf "\tmov r0, r12";
-        Printf.sprintf "\tmov %s, r0" s
-      ] @ !temp_loads;
+        Printf.sprintf "\tpop {r4-r10}";
+        Printf.sprintf "\tmov %s, r0" s]
+        @ instructions @ !temp_loads;
+
     | CallClo (reg, nb_params) ->
 
       let first_element = match !sp_values with
@@ -136,21 +143,26 @@ let rec generate_asm_regt : regt -> string list = function
       done;
 
       let instructions =
-        if first_element <= 255 then
-          [Printf.sprintf "\tsub sp, fp, #%d" first_element]
+        if !pushed_vars = 1 then
+          begin
+            pushed_vars := 0;
+            if first_element < 255 then
+              [Printf.sprintf "\tsub sp, fp, #%d" first_element]
+            else
+              let label = generate_num_label () in
+              consts := !consts @ [label ^ ": .word " ^ string_of_int (first_element * 4) ^ "\n"];
+              ["\tldr r12, " ^ label;
+               "\tsub sp, fp, r12"]
+          end
         else
-          let label = generate_num_label () in
-          consts := !consts @ [label ^ ": .word " ^ string_of_int (first_element * 4) ^ "\n"];
-          ["\tldr r12, " ^ label;
-            "\tsub sp, fp, r12"] in
+          [] 
+      in  
   
       [ Printf.sprintf "\tpush {r4-r10}";
-        Printf.sprintf "\tblx %s" reg;
-        Printf.sprintf "\tmov r12, r0";
-        Printf.sprintf "\tpop {r4-r10}"] @ instructions @
-      [ Printf.sprintf "\tmov r0, r12";
-        Printf.sprintf "\tmov %s, r0" s
-      ] @ !temp_loads;
+        Printf.sprintf "\tblx r12";
+        Printf.sprintf "\tpop {r4-r10}";
+        Printf.sprintf "\tmov %s, r0" s]
+        @ instructions @ !temp_loads;
     | Adresse a -> 
       if abs(int_of_string a) <= 255 then
         [Printf.sprintf "\tadd %s, fp, #%s" s a]
@@ -236,19 +248,26 @@ let rec generate_asm_regt : regt -> string list = function
     done;
 
     let instructions =
-      if first_element < 255 then
-        [Printf.sprintf "\tsub sp, fp, #%d" first_element]
+      if !pushed_vars = 1 then
+        begin
+          pushed_vars := 0;
+          if first_element < 255 then
+            [Printf.sprintf "\tsub sp, fp, #%d" first_element]
+          else
+            let label = generate_num_label () in
+            consts := !consts @ [label ^ ": .word " ^ string_of_int (first_element * 4) ^ "\n"];
+            ["\tldr r12, " ^ label;
+             "\tsub sp, fp, r12"]
+        end
       else
-        let label = generate_num_label () in
-        consts := !consts @ [label ^ ": .word " ^ string_of_int (first_element * 4) ^ "\n"];
-        ["\tldr r12, " ^ label;
-          "\tsub sp, fp, r12"] in
+        [] 
+    in  
 
     [ Printf.sprintf "\tpush {r4-r10}";
       Printf.sprintf "\tbl %s" func_name;
-      Printf.sprintf "\tmov r12, r0";
-      Printf.sprintf "\tpop {r4-r10}"] @ instructions @
-    [ Printf.sprintf "\tmov r0, r12"] @ !temp_loads;
+      Printf.sprintf "\tpop {r4-r10}"] 
+      @ instructions @ !temp_loads;
+      
   | CallClo (reg, nb_params) ->
 
     let first_element = match !sp_values with
@@ -267,26 +286,35 @@ let rec generate_asm_regt : regt -> string list = function
     done;
 
     let instructions =
-      if first_element < 255 then
-        [Printf.sprintf "\tsub sp, fp, #%d" first_element]
+      if !pushed_vars = 1 then
+        begin
+          pushed_vars := 0;
+          if first_element < 255 then
+            [Printf.sprintf "\tsub sp, fp, #%d" first_element]
+          else
+            let label = generate_num_label () in
+            consts := !consts @ [label ^ ": .word " ^ string_of_int (first_element * 4) ^ "\n"];
+            ["\tldr r12, " ^ label;
+             "\tsub sp, fp, r12"]
+        end
       else
-        let label = generate_num_label () in
-        consts := !consts @ [label ^ ": .word " ^ string_of_int (first_element * 4) ^ "\n"];
-        ["\tldr r12, " ^ label;
-          "\tsub sp, fp, r12"] in
+        [] 
+    in  
 
     [ Printf.sprintf "\tpush {r4-r10}";
-      Printf.sprintf "\tblx %s" reg;
-      Printf.sprintf "\tmov r12, r0";
-      Printf.sprintf "\tpop {r4-r10}"] @ instructions @
-    [ Printf.sprintf "\tmov r0, r12"] @ !temp_loads;
+      Printf.sprintf "\tblx r12";
+      Printf.sprintf "\tpop {r4-r10}"
+    ] @ instructions @ !temp_loads;
   | Label l -> [Printf.sprintf "\tldr r0, =%s" l]
   | Neg s1 -> [Printf.sprintf "\tneg r0, %s" s1]
   | Unit -> []
   | _ -> assert false)
 | Store (Reg reg, mem) -> [Printf.sprintf "\tstr %s, [fp, #%s]" reg mem]
 | Load (s, Reg reg) -> [Printf.sprintf "\tldr %s, [fp, #%s]" reg s]
-| Push (r) -> [Printf.sprintf "\tpush {%s}" r]
+| LoadReg (s, Reg reg) -> [Printf.sprintf "\tldr %s, [%s]" s reg]
+| Push (r) -> 
+  pushed_vars := 1;
+  [Printf.sprintf "\tpush {%s}" r]
 | _ -> assert false
 
 and generate_asm_fun_internal : reg_function -> string list = fun { name; body } ->

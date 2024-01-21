@@ -20,6 +20,7 @@ and regt=
   | Exp of reg_expr
   | Store of reg_expr * Id.t 
   | Load of Id.t * reg_expr 
+  | LoadReg of Id.t * reg_expr 
   | Push of Id.t
       
 and letregdef = 
@@ -32,7 +33,6 @@ and reg_function = {
 
 let num_params : int list ref = ref []
   
-
 (* Fonction pour print les hashmap et listes de string *)
 let print_hashtable my_hashtable =
   Hashtbl.iter (fun key value ->
@@ -202,6 +202,11 @@ let get_intervals_i asml var_to_register list_param=
         i_intervals_string hd;
         i_intervals_expr (CALL (s,tl))
     | CALL (_, []) -> ()
+    | CALLCLO (s,hd::tl) ->
+        i_intervals_string s;
+        i_intervals_string hd;
+        i_intervals_expr (CALL (s,tl))
+    | CALLCLO (_, []) -> ()
     | IFEQ ((s,i_o_s) , asmt1, asmt2) | IFLE ((s,i_o_s) , asmt1, asmt2) | IFGE ((s,i_o_s) , asmt1, asmt2) ->
         i_intervals_string s;
         i_intervals_id_or_imm i_o_s;
@@ -420,6 +425,16 @@ let parcours asml =
           | [] -> 0
         in
         Call (s, first_element)
+    | CALLCLO (s, ls) ->
+        let r = Hashtbl.find var_to_register s in
+        bd := !bd @ [LoadReg ("r12", Reg r)];
+        store_to_regs_params ls bd var_to_register var_in_stack;
+        let first_element = match !num_params with
+          | hd :: _ -> hd
+          | [] -> 0
+        in
+        
+        CallClo (r, first_element)
     | IFEQ ((s,i_o_s) , asmt1, asmt2) ->
         parcours_if "eq" s i_o_s asmt1 asmt2 var_to_register var_in_stack list_params
     | IFLE ((s,i_o_s) , asmt1, asmt2) ->
