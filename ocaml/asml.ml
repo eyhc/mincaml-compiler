@@ -51,6 +51,21 @@ and asml = letdef list
 (************************
   Generation functions
 ************************)
+let convert_predef_name (f:Id.t): Id.t =
+  match f with
+  | "print_int" -> "_min_caml_print_int"
+  | "print_float" -> "_min_caml_print_float"
+  | "print_newline" -> "_min_caml_print_newline"
+  | "sin" -> "_min_caml_sin"
+  | "cos" -> "_min_caml_cos"
+  | "sqrt" -> "_min_caml_sqrt"
+  | "abs" -> "_min_caml_abs"
+  | "abs_float" -> "_min_caml_abs_float"
+  | "int_of_float" -> "_min_caml_int_of_float"
+  | "float_of_int" -> "_min_caml_float_of_int"
+  | "truncate" ->  "_min_caml_truncate"
+  | _ -> failwith (sprintf "asml generation : %s not a predef function" f)
+
 let call_predef (f:Id.l) (vars:Id.t list) : expr = 
   match f with
   | "print_int" -> CALL ("_min_caml_print_int", vars)
@@ -99,19 +114,34 @@ let make_closure (id: Id.t) (f: Id.t) (frees: Id.t list) (next: asmt): asmt =
 
 let rec generation_call (id: Id.t) (f: Id.t) (args: Id.t list) (next: asmt): asmt =
   (* Ensemble des paramètres qui sont des fonctions *)
-  let f_args = List.filter (fun x -> is_fun x) args in
+  let f_args = List.filter (fun x -> is_fun x || Typechecker.is_prefef_fun x) args in
   if List.length f_args > 0 then
     (* Au moins un des paramètres est une fonction *)
     (* Pour chaque argument qui est une fonction, on génère une variable qui va contenir la closure pour cette fonction *)
     let args_ids = (List.map (fun x -> (x, Id.genid ())) f_args) in
     let rec generate_funs_closure (args: (Id.t * Id.t) list) (next: asmt): asmt =
       match args with
-      | [(x, y)] -> let f = get_fdef x in make_closure y (fst f.label) (List.map fst f.frees) next
-      | (x, y) :: tail -> let f = get_fdef x in make_closure y (fst f.label) (List.map fst f.frees) (generate_funs_closure tail next)
+      | [(x, y)] -> 
+          if Typechecker.is_prefef_fun x then
+            make_closure y (convert_predef_name x) [] next
+          else
+            let f = get_fdef x in 
+            make_closure y (fst f.label) (List.map fst f.frees) next
+      | (x, y) :: tail -> 
+          if Typechecker.is_prefef_fun x then
+            make_closure y (convert_predef_name x) [] (generate_funs_closure tail next)
+          else
+            let f = get_fdef x in make_closure y (fst f.label) (List.map fst f.frees) (generate_funs_closure tail next)
       | _ -> assert false
     in
+    let rename_arg (arg: Id.t): Id.t =
+      if List.exists (fun y -> (fst y) = arg) args_ids then
+        snd (List.find (fun y -> (fst y) = arg) args_ids)
+      else 
+        arg
+    in
     (* Le call avec les arguments mis à jour *)
-    let call = CALL(f, List.map (fun x -> if List.exists (fun y -> (fst y) = x) args_ids then snd (List.find (fun y -> (fst y) = x) args_ids) else x) args) in
+    let call = CALL(f, List.map rename_arg args) in
     let call = LET(id, call, next) in
     generate_funs_closure args_ids call
   else
@@ -207,7 +237,15 @@ and generation_asmt (env: VarSet.t) (a:Closure.t) : asmt =
   | Float f -> 
     let id = Id.make_unique "x" in
       generation_float id f (EXP (VAL (Var id)))
-  | _ -> EXP (generation_expr env a)
+  | _ -> 
+    (match a with
+    | Var id when Typechecker.is_prefef_fun id -> 
+        let var_id = Id.genid () in
+        make_closure var_id (convert_predef_name id) [] (EXP(VAL(Var(var_id))))
+    | ApplyDir(f, vars) -> 
+        let var_id = Id.genid () in
+        generation_call var_id f vars (EXP(VAL(Var(var_id))))
+    | _ -> EXP (generation_expr env a))
 
 let rec generation_letdef (a:Closure.fundef) : letdef =
   (* Ajoute le chargement des variables libres de la fonction au début du code de celle-ci *)
