@@ -365,13 +365,21 @@ let parcours asml =
         bd := !bd @ [Store (Reg r_var, adr)];
         parcours_asmt exp bd var_to_register var_in_stack list_params;
     | LET (var1, MEMGET (var, Const n), exp) ->
-        let active = get_intervals_i asmt var_to_register list_params in
-        store_load active bd var_to_register var_in_stack list_params;
-        let r = Hashtbl.find var_to_register var1 in
-        let r_var = Hashtbl.find var_to_register var in
-        let offset = "-" ^ string_of_int (n)  in
-        bd := !bd @ [Let (r, MemGet (r_var, offset))];
-        parcours_asmt exp bd var_to_register var_in_stack list_params; 
+      let active = get_intervals_i asmt var_to_register list_params in
+      store_load active bd var_to_register var_in_stack list_params;
+      let r = Hashtbl.find var_to_register var1 in
+      let r_var = ref "" in
+      if var = "\%self" then begin
+        r_var := "r0" ;
+        let r_self = Hashtbl.find var_to_register "\%self" in
+        Hashtbl.remove var_to_register "\%self";
+        reg_available := !reg_available @ [r_self];
+      end
+      else 
+        r_var := Hashtbl.find var_to_register var ;
+      let offset = "-" ^ string_of_int (n)  in
+      bd := !bd @ [Let (r, MemGet (!r_var, offset))];
+      parcours_asmt exp bd var_to_register var_in_stack list_params; 
     | LET (var1, var2, exp) ->
         let active = get_intervals_i asmt var_to_register list_params in
         store_load active bd var_to_register var_in_stack list_params;
