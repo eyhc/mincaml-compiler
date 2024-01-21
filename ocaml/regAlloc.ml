@@ -6,6 +6,13 @@ type reg_expr =
   | Neg of Id.t
   | Add of Id.t * reg_expr
   | Sub of Id.t * reg_expr
+  | Fneg of Id.t
+  | Fadd of Id.t * Id.t 
+  | Fsub of Id.t * Id.t 
+  | Fmul of Id.t * Id.t 
+  | Fdiv of Id.t * Id.t 
+  | Iffequal of (Id.t*Id.t) * regt list * regt list
+  | Iffle of (Id.t*Id.t) * regt list * regt list
   | Call of Id.l * int
   | CallClo of Id.l * int
   | If of Id.l * (Id.t*reg_expr) * regt list * regt list
@@ -18,6 +25,7 @@ type reg_expr =
 and regt= 
   | Let of Id.t * reg_expr 
   | Exp of reg_expr
+  | LetFloat of Id.l * Id.t
   | Store of reg_expr * Id.t 
   | Load of Id.t * reg_expr 
   | LoadReg of Id.t * reg_expr 
@@ -369,10 +377,10 @@ let parcours asml =
       store_load active bd var_to_register var_in_stack list_params;
       let r = Hashtbl.find var_to_register var1 in
       let r_var = ref "" in
-      if var = "\%self" then begin
-        r_var := "r0" ;
-        let r_self = Hashtbl.find var_to_register "\%self" in
-        Hashtbl.remove var_to_register "\%self";
+      if var = "%self" then begin
+        r_var := "r12" ;
+        let r_self = Hashtbl.find var_to_register "%self" in
+        Hashtbl.remove var_to_register "%self";
         reg_available := !reg_available @ [r_self];
       end
       else 
