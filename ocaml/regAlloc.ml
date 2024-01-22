@@ -25,15 +25,15 @@ type reg_expr =
 and regt= 
   | Let of Id.t * reg_expr 
   | Exp of reg_expr
-  | LetFloat of Id.l * Id.t
   | Store of reg_expr * Id.t 
   | Load of Id.t * reg_expr 
   | LoadReg of Id.t * reg_expr 
   | Push of Id.t
-      
-and letregdef = 
-  | Fun of reg_function
   
+  and letregdef = 
+    | Fun of reg_function
+    | LetFloatReg of Id.l * Id.t
+    
 and reg_function = {
   name : Id.l;
   body : regt list
@@ -63,6 +63,12 @@ let reg_available = ref registers;;
 let register_param = ["r0";"r1";"r2";"r3"];;
 (* Registres utilisés pour store les parametres des fonctions *)
 let register_store_param = "r12";;
+(* hashmap de `nom de float` -> registre *)
+let float_to_reg = Hashtbl.create 0;;
+(* Registres pour float *)
+let float_reg = ref ["s0"; "s1"; "s2"; "s3"; "s4"; "s5"; "s6"; "s7"; "s8"; "s9"; "s10"; "s11"; "s12"; "s13"; "s14"; "s15"; "s16"; "s17"; "s18"; "s19"; "s20"; "s21"; "s22"; "s23"; "s24"; "s25"; "s26"; "s27"; "s28"; "s29"; "s30"; "s31"];;
+let new_sizes = Hashtbl.create 0;;
+
 
 (*------------------------------ FONCTION AUXILIAIRE -----------------------------*)
 let quatre_premiers_elem list_params = 
@@ -404,7 +410,7 @@ let parcours asml =
         let r = Hashtbl.find var_to_register var1 in
 
         (match var2 with 
-         | NEW i_o_s ->
+         | NEW (Const n) ->
              let adr = calcul_adr var_in_stack list_params in
              let next_adr = (int_of_string adr) - 4 in
              Hashtbl.add var_in_stack var1 adr;
@@ -412,7 +418,7 @@ let parcours asml =
              bd := !bd @ [Push (r)];
              Hashtbl.remove var_to_register var1;
              reg_available := !reg_available @ [r];
-             
+             Hashtbl.add new_sizes var1 (string_of_int n)
          | _ ->
              Hashtbl.remove var_to_register var1;
              reg_available := !reg_available @ [r];
@@ -423,6 +429,13 @@ let parcours asml =
         );
         parcours_asmt exp bd var_to_register var_in_stack list_params;
     | EXP expr ->
+        (* match expr with 
+        | VAL (Var t) ->
+            (*(try let size = Hashtbl.find new_sizes t ; 
+                  
+             with e -> *)
+              
+        | _ ->  *)
         let active = get_intervals_i asmt var_to_register list_params in
         store_load active bd var_to_register var_in_stack list_params;
         bd := !bd @ [Exp (parcours_expr expr bd var_to_register active var_in_stack list_params )];
@@ -503,7 +516,10 @@ let parcours asml =
         } in
         new_body:= !new_body @ [Fun new_func];
         parcours_asml_list tl
-    | LetFloat _ :: tl -> !new_body (* À définir *)
+    | LetFloat (label,fl) :: tl -> 
+        new_body := !new_body @ [LetFloatReg (label, (string_of_float fl))];
+        Hashtbl.add float_to_reg label "";
+        parcours_asml_list tl
     | LetLabel (fun_name, list_params, hd) :: tl ->
         let var_to_register = Hashtbl.create 0 in
         let var_in_stack = Hashtbl.create 0 in
@@ -524,6 +540,7 @@ let parcours asml =
           name = fun_name;
           body = !(parcours_asmt hd body_func var_to_register var_in_stack list_params);
         } in
+        
         new_body := !new_body @ [Fun new_func];
         (match !num_params with
          | _ :: rest ->

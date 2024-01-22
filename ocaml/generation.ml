@@ -339,9 +339,7 @@ let rec generate_asm_regt : regt -> string list = function
 | Push (r) -> 
   pushed_vars := 1;
   [Printf.sprintf "\tpush {%s}" r]
-| LetFloat (s, f) -> 
-  floats := !floats @ [s ^ ": .float " ^ f];
-  []
+
 | _ -> assert false
 
 (* Function which will calculate the prologue SP value of a function,
@@ -417,6 +415,9 @@ let generate_asm_reg (defs: letregdef list) : string list =
         | Fun f ->
           let asm_hd = generate_asm_fun_internal f in
           generate_asm_internal (acc @ asm_hd) tl
+        | LetFloatReg (s, f) -> 
+          floats := !floats @ [s ^ ": .float " ^ f];
+          []
     in
     let asm_code = generate_asm_internal [] defs in !header @ !consts @ !floats @ asm_code
   
