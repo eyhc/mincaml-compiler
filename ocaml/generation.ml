@@ -1,6 +1,6 @@
 open RegAlloc
 
-let header : string list ref = ref [".text"; ".global _start"; ""]
+let header : string list ref = ref [".text"; ".global main"; ""]
 let consts : string list ref = ref []
 let floats : string list ref = ref []
 
@@ -389,7 +389,7 @@ let generate_asm_reg (defs: letregdef list) : string list =
       | [] -> acc
       | hd :: tl ->
         match hd with
-        | Fun f when f.name = "_start" ->
+        | Fun f when f.name = "main" ->
           let asm_hd = generate_asm_fun_internal f in
           generate_asm_internal (asm_hd @ acc) tl
         | Fun f ->

@@ -489,7 +489,7 @@ let parcours asml =
         reg_available := registers ;
         fill_var_to_register active var_to_register;
         let new_func : reg_function = {
-          name = "_start";
+          name = "main";
           body = !(parcours_asmt hd (ref []) var_to_register var_in_stack []) @ [Exp (Call ("_min_caml_exit", 0))];
         } in
         new_body:= !new_body @ [Fun new_func];
