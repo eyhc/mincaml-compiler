@@ -192,7 +192,7 @@ let rec generate_asm_regt : regt -> string list = function
         [Printf.sprintf "\tldr %s, [%s, #%s]" s s1 adr]
     | Label l -> [Printf.sprintf "\tldr %s, =%s" s l]
     | Neg s1 -> [Printf.sprintf "\tneg %s, %s" s s1]
-    | Unit -> []
+    | Unit -> [Printf.sprintf "\tmov %s, #0" s]
     | _ -> assert false)
 | Exp exp ->
 (match exp with

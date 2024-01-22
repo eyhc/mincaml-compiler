@@ -88,15 +88,15 @@ let rec to_string ?(p: string = "") exp: string =
   Génère un label pour une fonction
   Paramètres:
   - var -> le nom de la fonction
-  Retourne: un label
+  Retourne: le label de la fonction
 *)
 let genlabel (var: Id.t): Id.t = "_"^var
 
 (* 
-  Cherche la liste des variables dans une expression
+  Cherche l'ensemble des variables dans une expression
   Paramètres:
-  - env -> l'environnement de l'expression
-  - parent -> la fonction dans laquelle se trouve cette expression
+  - env -> l'environnement de l'expression, un ensemble de variables
+  - parent -> le nom de la fonction dans laquelle se trouve cette expression et l'ensemble de ses variables libres
   - exp -> une expression de type knorm_t
   Retourne: une liste de variables
 *)
@@ -140,6 +140,7 @@ let rec fun_free_vars (env: VarSet.t) (parent: Id.t * VarSet.t) (exp: Knorm.knor
 *)
 let convert (exp: Knorm.knorm_t): fundef list * t =
   let funs = ref [] in
+  (* Convertit les noms des fonctions dans une liste d'arguments pour qu'ils soient des labels de fonction *)
   let convert_args (args: Id.t list): Id.t list =
     List.map (fun x -> let label = genlabel x in if List.exists (fun y -> (fst y.label) = label) !funs then label else x) args
   in

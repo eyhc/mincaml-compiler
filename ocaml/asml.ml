@@ -51,6 +51,13 @@ and asml = letdef list
 (************************
   Generation functions
 ************************)
+
+(* 
+  Convertit le nom d'un fonction prédéfinie en son nom pour l'ASML
+  Paramètres:
+  - f -> le nom de la fonction
+  Retourne: le nom de la fonction convertit pour l'ASML
+*)
 let convert_predef_name (f:Id.t): Id.t =
   match f with
   | "print_int" -> "_min_caml_print_int"
@@ -66,23 +73,22 @@ let convert_predef_name (f:Id.t): Id.t =
   | "truncate" ->  "_min_caml_truncate"
   | _ -> failwith (sprintf "asml generation : %s not a predef function" f)
 
+(* 
+  Génère le code ASML de l'appel d'une fonction prédéfinie
+  Paramètres:
+  - f -> le nom de la fonction prédéfinie
+  - vars -> les arguments de l'appel de la fonction
+  Retourne: le code ASML de l'appel de la fonction   
+*)
 let call_predef (f:Id.l) (vars:Id.t list) : expr = 
   match f with
-  | "print_int" -> CALL ("_min_caml_print_int", vars)
-  | "print_float" -> CALL ("_min_caml_print_float", vars)
   | "print_newline" -> CALL ("_min_caml_print_newline", ["()"])
-  | "sin" -> CALL ("_min_caml_sin", vars)
-  | "cos" -> CALL ("_min_caml_cos", vars)
-  | "sqrt" -> CALL ("_min_caml_sqrt", vars)
-  | "abs" -> CALL ("_min_caml_abs", vars)
-  | "abs_float" -> CALL ("_min_caml_abs_float", vars)
-  | "int_of_float" -> CALL ("_min_caml_int_of_float", vars)
-  | "float_of_int" -> CALL ("_min_caml_float_of_int", vars)
-  | "truncate" -> CALL ("_min_caml_truncate", vars)
-  | _ -> failwith (sprintf "asml generation : %s not a predef function" f)
+  | _ -> CALL(convert_predef_name f, vars)
 
+(* L'ensemble des variables de type float du programme *)
 let floatsdef: letdef list ref = ref []
 
+(* La définition des fonctions du programme mais non converties en ASML  *)
 let funsdef: Closure.fundef list ref = ref []
 
 let get_fdef (name: Id.t): Closure.fundef =
@@ -98,7 +104,17 @@ let is_freefun (name: Id.t): bool =
   else
     false
 
+(* 
+  Crée une closure en ASML pour la fonction de label f
+  Paramètres:
+  - id -> le nom de la variable qui sera un pointeur va la closure
+  - f -> le label de la fonction
+  - frees -> l'ensemble des variables libres de la fonction
+  - next -> le code devant être après la closure
+  Retourne: le code ASML de la closure nouvellement créée
+*)
 let make_closure (id: Id.t) (f: Id.t) (frees: Id.t list) (next: asmt): asmt =
+  (* Ajoute les variables libres de la fonction dans la closure *)
   let rec frees_mem_assign (p: Id.t) (n: int) (frees: Id.t list) (next: asmt): asmt =
     match frees with
     | [x] -> LET(Id.genid (), MEMASSIGN(p, Const(n), x), next)
@@ -112,6 +128,16 @@ let make_closure (id: Id.t) (f: Id.t) (frees: Id.t list) (next: asmt): asmt =
   let pointer = LET(id, NEW(Const(size)), f_addr) in
   pointer
 
+(* 
+  Convertit le code d'un appel de fonction, en ajoutant si nécessaire des closures si un ou plusieurs des paramètres
+  sont des fonctions
+  Paramètres:
+  - id -> le nom de la variable qui contiendra l'appel à la fonction
+  - f -> le label de la fonction appelée
+  - args -> les arguments de la fonction appelée
+  - next -> le code près cet appel de fonction
+  Retourne: le code ASML de l'appel de la fonction, les closures nécessaire sont placées avant dans le code   
+*)
 let rec generation_call (id: Id.t) (f: Id.t) (args: Id.t list) (next: asmt): asmt =
   (* Ensemble des paramètres qui sont des fonctions *)
   let f_args = List.filter (fun x -> is_fun x || Typechecker.is_prefef_fun x) args in
@@ -119,6 +145,7 @@ let rec generation_call (id: Id.t) (f: Id.t) (args: Id.t list) (next: asmt): asm
     (* Au moins un des paramètres est une fonction *)
     (* Pour chaque argument qui est une fonction, on génère une variable qui va contenir la closure pour cette fonction *)
     let args_ids = (List.map (fun x -> (x, Id.genid ())) f_args) in
+    (* Ajoute les closures nécessaire pour les paramètres qui sont des fonctions *)
     let rec generate_funs_closure (args: (Id.t * Id.t) list) (next: asmt): asmt =
       match args with
       | [(x, y)] -> 
@@ -134,6 +161,7 @@ let rec generation_call (id: Id.t) (f: Id.t) (args: Id.t list) (next: asmt): asm
             let f = get_fdef x in make_closure y (fst f.label) (List.map fst f.frees) (generate_funs_closure tail next)
       | _ -> assert false
     in
+    (* Remplace les arguments qui sont des fonctions par les variables qui contiennent le pointeur de leur closure *)
     let rename_arg (arg: Id.t): Id.t =
       if List.exists (fun y -> (fst y) = arg) args_ids then
         snd (List.find (fun y -> (fst y) = arg) args_ids)
@@ -148,8 +176,17 @@ let rec generation_call (id: Id.t) (f: Id.t) (args: Id.t list) (next: asmt): asm
     (* Aucun des arguments n'est une fonction *)
     LET(id, (if Typechecker.is_prefef_fun f then call_predef f args else CALL(f, args)), next)
 
+(* 
+  Génère le code ASML pour la déclaration d'un tuple
+  Paramètres:
+  - id -> le nom de la variable qui contiendra le pointeur sur le tuple
+  - vars -> l'ensemble des valeurs du tuple
+  - e1 -> le code après la déclaration du tuple
+  Retourne: le code ASML de la déclaration du tuple
+*)
 and generation_tuple (id: Id.t) (vars: Id.t list) (e1: asmt): asmt =
   let size = List.length vars in
+  (* Ajoute les mem assign nécessaire pour les éléments du tuple *)
   let rec gen (p: Id.t) (n: int) (vs: Id.t list) (next: asmt): asmt =
     match vs with
     | [x] -> LET(Id.genid (), MEMASSIGN(id, Const(n), x), next)
@@ -158,6 +195,16 @@ and generation_tuple (id: Id.t) (vars: Id.t list) (e1: asmt): asmt =
   in
   LET(id, NEW(Const(size * 4)), gen id 0 vars e1)
 
+(* 
+  Génère le code ASML pour la déclaration d'un tableau
+  Paramètres:
+  - id -> le nom de la variable qui contiendra le pointeur sur le tableau
+  - typ -> le type des valeurs du tableau (entiers ou flottants)
+  - size -> la taille du tableau en nombre d'éléments
+  - default -> la valeur par défaut des éléments du tableau
+  - e1 -> le code ASML suivant la déclaration du tableau
+  Retourne: le code ASML de la déclaration du tableau
+*)
 and generation_arraycreate (id: Id.t) (typ: Type.t) (size: Id.t) (default: Id.t) (e1: asmt): asmt =
   let f = 
     match typ with
@@ -166,12 +213,27 @@ and generation_arraycreate (id: Id.t) (typ: Type.t) (size: Id.t) (default: Id.t)
   in
   LET(id, CALL(f, [size; default]), e1)
 
+(* 
+  Génère le code ASML de la déclaration d'un flottant
+  Paramètres:
+  - id -> le nom de la variable qui contiendra le flottant
+  - f -> la valeur du flottant
+  - e1 -> le code ASML suivant la déclaration du flottant
+  Retourne: le code ASML de la déclaration du flottant
+*)
 and generation_float (id: Id.t) (f: float) (e1: asmt): asmt =
   floatsdef := LetFloat("_"^id, f) :: !floatsdef;
   let addr_id = Id.genid () in
   let load = LET(id, MEMGET(addr_id, Const(0)), e1) in
   LET(addr_id, LABEL("_"^id), load)
 
+(* 
+  Génère le code ASML d'une expression
+  Paramètres:
+  - env -> l'ensemble des variables connues dans l'environnement de l'expression
+  - a -> le code de l'expression après la closure conversion
+  Retourne: le code ASML de l'expression
+*)
 and generation_expr (env: VarSet.t) (a:Closure.t) : expr =
   match a with
   | Unit -> NOP
@@ -210,6 +272,13 @@ and generation_expr (env: VarSet.t) (a:Closure.t) : expr =
   | Put(a, b, c) -> MEMASSIGN(a, Var(b), c)
   | _ -> printf("%s\n") (Closure.to_string a); assert false
 
+(*
+  Génère le code ASML pour les déclarations de variables et les valeurs retournées par les fonctions
+  Paramètres:
+  - env -> l'ensemble des variables connues dans l'environnement de l'expression
+  - a -> le code de l'expression après la closure conversion
+  Retourne: le code ASML de l'expression a
+*)
 and generation_asmt (env: VarSet.t) (a:Closure.t) : asmt = 
   match a with
   | Let ((x, t), e1, e2) -> 
@@ -235,18 +304,24 @@ and generation_asmt (env: VarSet.t) (a:Closure.t) : asmt =
       let f = get_fdef l in
       make_closure x (fst f.label) (List.map fst f.frees) (generation_asmt env' e1)
   | Float f -> 
-    let id = Id.make_unique "x" in
+      let id = Id.make_unique "x" in
       generation_float id f (EXP (VAL (Var id)))
-  | _ -> 
-    (match a with
-    | Var id when Typechecker.is_prefef_fun id -> 
-        let var_id = Id.genid () in
-        make_closure var_id (convert_predef_name id) [] (EXP(VAL(Var(var_id))))
-    | ApplyDir(f, vars) -> 
-        let var_id = Id.genid () in
-        generation_call var_id f vars (EXP(VAL(Var(var_id))))
-    | _ -> EXP (generation_expr env a))
+  (* Lorsqu'une fonction retourne le contenu d'une variable *)
+  | Var id when Typechecker.is_prefef_fun id -> 
+      let var_id = Id.genid () in
+      make_closure var_id (convert_predef_name id) [] (EXP(VAL(Var(var_id))))
+  (* Lorsqu'une fonction retourne la valeur de retour d'une autre fonction *)
+  | ApplyDir(f, vars) -> 
+      let var_id = Id.genid () in
+      generation_call var_id f vars (EXP(VAL(Var(var_id))))
+  | _ -> EXP (generation_expr env a)
 
+(* 
+    Génère le code ASML pour les définitions des fonctions
+    Paramètres:
+    - a -> la définition d'une fonction après la closure conversion
+    Retourne: le code ASML de la fonction
+*)
 let rec generation_letdef (a:Closure.fundef) : letdef =
   (* Ajoute le chargement des variables libres de la fonction au début du code de celle-ci *)
   let rec add_load_frees (n: int) (frees: Id.t list) (code: asmt) : asmt =
@@ -260,10 +335,10 @@ let rec generation_letdef (a:Closure.fundef) : letdef =
   )
 
 (* 
-Génère le code asml équivalent au programme en paramètre
-Paramètres:
-- ast -> l'ast du programme
-Retourne: un élément de type asml
+  Génère le code asml équivalent au programme en paramètre
+  Paramètres:
+  - ast -> l'ast du programme
+  Retourne: un élément de type asml
 *)
 let rec generation (ast:Closure.t) : asml = 
   match ast with
@@ -382,9 +457,9 @@ let rec string_exp (e:expr) =
   let rec string_letdef (l:letdef) : string =
     match l with
     | Main asmt -> sprintf "\nMain (%s)" (string_asmt asmt)
-    | LetFloat(l, f) -> sprintf "\nLetFloat (%f)" f
+    | LetFloat(l, f) -> sprintf "\nLetFloat (\"%s\", %f)" l f
     | LetLabel (l, args, asmt) -> 
-      sprintf "\nLetLabel(\"%s\", [%s], %s)"
+      sprintf "\nLetLabel (\"%s\", [%s], %s)"
       (Id.to_string l)
       (Syntax.infix_to_string (fun x -> sprintf "\"%s\"" (Id.to_string x)) args ";")
       (string_asmt asmt)

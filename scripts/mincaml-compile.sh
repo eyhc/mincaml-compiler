@@ -1,15 +1,13 @@
 #!/bin/sh
 
 pwd
+export QEMU_LD_PREFIX=/usr/arm-linux-gnueabi/
 
 ./ocaml/mincamlc $1 -o ./ARM/prog.s
 
-arm-linux-gnueabi-as ./ARM/prog.s ./ARM/libmincaml.S -o prog.o
-
-arm-linux-gnueabi-ld prog.o -o prog.arm
-
+arm-linux-gnueabi-gcc ./ARM/prog.s ./ARM/libmincaml.S -o prog.arm -lm
 qemu-arm prog.arm
 
 echo "\n"
 
-rm prog.o prog.arm ./ARM/prog.s
+rm prog.arm ./ARM/prog.s
