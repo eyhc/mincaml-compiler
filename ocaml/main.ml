@@ -2,7 +2,7 @@
 
 (* version *)
 let show_version () =
-  print_endline "MinCamlCompiler v0.2.1 - 19-01-2023";
+  print_endline "MinCamlCompiler v0.2.2 - 22-01-2023";
   exit 0
 
 (* Global variables for Arg's parser *)
@@ -21,6 +21,12 @@ and back_print = ref false
 (* -n_iter *)
 let n_iter_optim = ref 500
 
+(* -show_type *)
+let show_type = ref false
+
+
+(************************************************************************)
+
 let usage_msg = Printf.sprintf "Usage: %s [options]" (Array.get Sys.argv 0)
 
 (* Arg parser speclist : CF Arg library *)
@@ -33,6 +39,7 @@ let speclist = [
   ("-p", Arg.Unit (fun () -> parse_only := true), "Parse only");
   ("-n_iter", Arg.Set_int(n_iter_optim), "<integer> Set the number of optimisation iterations");
   ("-inline_deep", Arg.Set_int(Inline.max_deep), "<i> Set the max_deep of inline expansion");
+  ("-show_type", Arg.Unit (fun () -> show_type := true), "show type informations");
   ("-test-knorm", Arg.Unit(fun () -> test := true; knorm_only :=true), "Knormalization only");
   ("-test-alpha", Arg.Unit(fun () -> test := true; alpha :=true), "Alpha-reduction");
   ("-test-let", Arg.Unit(fun () -> test := true; let_reduc :=true), "Reduction of nested let-expression");
@@ -51,6 +58,7 @@ let show_help r =
     MAIN FUNCTIONS
  *********************)
 
+(*======= ancillary functions =======*)
 let get_ast file = 
   let inchan = open_in file in
   (try
@@ -60,38 +68,59 @@ let get_ast file =
 let set_arm_file arm out_file =
   let oc_reg = open_out out_file in
     List.iter (fun instruction -> output_string oc_reg (instruction ^ "\n")) arm;
-  close_out oc_reg;
-  print_endline ("Results written to " ^ out_file)
+    close_out oc_reg
 
+let set_asml_file asml out_file =
+  let oc_reg = open_out out_file in
+    output_string oc_reg (Asml.to_string asml);
+    close_out oc_reg
+
+
+(*======= Tests fonctions =======*)
 let print_ast f =
   let ast = get_ast f in
-    print_endline (Syntax.to_string ast)
+    if !show_type then
+      print_endline (Syntax.to_string_with_types ast)
+    else
+      print_endline (Syntax.to_string ast)
 
 (* Type Checking function *)
 let type_check_only f = 
   let ast = get_ast f in
     Typechecker.type_check ast;
-    print_endline (Syntax.to_string_with_types ast);
+    (if !show_type then
+      print_endline (Syntax.to_string_with_types ast)
+    else
+      print_endline (Syntax.to_string ast));
     print_endline "Type inference : OK"
 
 (* Test compiler steps functions *)
 let print_knorm ast =
   Typechecker.type_check ast;
   let res = Knorm.normalize ast in
-    print_endline (Knorm.to_string_with_type res)
+    if !show_type then
+      print_endline (Knorm.to_string res)
+    else
+      print_endline (Knorm.to_string_with_type res)
 
 let print_alpha ast =
   Typechecker.type_check ast;
   let res = Knorm.normalize ast in
-    let res = Alpha.conversion res in
-    print_endline (Knorm.to_string res)
+  let res = Alpha.conversion res in
+    if !show_type then
+      print_endline (Knorm.to_string res)
+    else
+      print_endline (Knorm.to_string_with_type res)
 
 let print_let_reduc ast =
   Typechecker.type_check ast;
   let res = Knorm.normalize ast in
-    let res = Alpha.conversion res in
-      let res = Reduction.reduction res in
+  let res = Alpha.conversion res in
+  let res = Reduction.reduction res in
+    if !show_type then
       print_endline (Knorm.to_string res)
+    else
+      print_endline (Knorm.to_string_with_type res)
 
 let print_optim ast =
   Typechecker.type_check ast;
@@ -102,27 +131,18 @@ let print_optim ast =
   let res = Inline.expansion res in
   let res = Constant.folding res in
   let res = Elim.elim_definition res in
-  print_endline (Knorm.to_string res)
+    if !show_type then
+      print_endline (Knorm.to_string res)
+    else
+      print_endline (Knorm.to_string_with_type res)
 
 let print_closure ast =
   Typechecker.type_check ast;
   let res = Knorm.normalize ast in
-    let res = Alpha.conversion res in
-      let res = Reduction.reduction res in
-        let res = Closure.closure res in
-        print_endline (Closure.to_string res)
-
-let iter_optim ast =
-  let rec iter_rec ast n =
-    if n = 0 then ast
-    else
-      let a = Beta.reduction ast in          (* Beta reduction *)
-      let a = Reduction.reduction a in       (* Reduction of nested-let *)
-      let a = Inline.expansion a in          (* Inline expansion *)
-      let a = Constant.folding a in          (* Constant folding *)
-      let a = Elim.elim_definition a in      (* Elim. unnecessary def *)
-      iter_rec a (n-1) (* to do : si point fixe ???? *)
-  in iter_rec ast !n_iter_optim
+  let res = Alpha.conversion res in
+  let res = Reduction.reduction res in
+  let res = Closure.closure res in
+    print_endline (Closure.to_string res)
 
 let print_back ast =
   Typechecker.type_check ast;
@@ -152,31 +172,50 @@ let print_test f =
     else
       print_endline "The function you want to test is missing ! Put the corresponding argument : -knorm; -alpha; -let; -closure"
 
+
+(********************************************************)
+(********************************************************)
+let iter_optim ast =
+  let rec iter_rec ast n =
+    if n = 0 then ast
+    else
+      let a = Beta.reduction ast in          (* Beta reduction *)
+      let a = Reduction.reduction a in       (* Reduction of nested-let *)
+      let a = Inline.expansion a in          (* Inline expansion *)
+      let a = Constant.folding a in          (* Constant folding *)
+      let a = Elim.elim_definition a in      (* Elim. unnecessary def *)
+      iter_rec a (n-1) (* to do : si point fixe ???? *)
+  in iter_rec ast !n_iter_optim
+
+
 (* Display asml of file f*)
-let print_asml f =
-  let ast = get_ast f in
-    Typechecker.type_check ast;              (* Typechecking *)
-    let ast = Knorm.normalize ast in         (* K-normalization *)
-    let ast = Alpha.conversion ast in        (* Alpha-conversion *)
-    let ast = iter_optim ast in              (* Optimizations *)
-    let ast = Reduction.reduction ast in     (* Reduction of nested-let *)
-    let ast = Closure.closure ast in         (* Closure conversion *)
-    let asml = Asml.generation ast in        (* ASML generation *)
-    let asml = ImmOptim.optim asml in        (* Immediate optimization *)
-    print_endline (Asml.to_string asml)      (* Displaying *)
+let print_asml f_in f_out =
+  let ast = get_ast f_in in
+    Typechecker.type_check ast;          (* Typechecking *)
+    let ast = Knorm.normalize ast in     (* K-normalization *)
+    let ast = Alpha.conversion ast in    (* Alpha-conversion *)
+    let ast = iter_optim ast in          (* Optimizations *)
+    let ast = Reduction.reduction ast in (* Reduction of nested-let *)
+    let ast = Closure.closure ast in     (* Closure conversion *)
+    let asml = Asml.generation ast in    (* ASML generation *)
+    let asml = ImmOptim.optim asml in    (* Immediate optimization *)
+    (match f_out with
+    | None -> print_endline (Asml.to_string asml)
+    | Some out -> set_asml_file asml out
+    )
 
 
 (* Compile code file f to arm (32?) *)
 let main (inp:string) (out:string) : unit = 
   let ast = get_ast inp in
-    Typechecker.type_check ast;              (* Typechecking *)
-    let ast = Knorm.normalize ast in         (* K-normalization *)
-    let ast = Alpha.conversion ast in        (* Alpha-conversion *)
-    let ast = iter_optim ast in              (* Optimisations *)
+    Typechecker.type_check ast;           (* Typechecking *)
+    let ast = Knorm.normalize ast in      (* K-normalization *)
+    let ast = Alpha.conversion ast in     (* Alpha-conversion *)
+    let ast = iter_optim ast in           (* Optimisations *)
     let ast = Reduction.reduction ast in 
-    let ast = Closure.closure ast in         (* Closure conversion *)
-    let asml = Asml.generation ast in        (* ASML generation *)
-    let asml = ImmOptim.optim asml in        (* Immediate optimization *)
+    let ast = Closure.closure ast in      (* Closure conversion *)
+    let asml = Asml.generation ast in     (* ASML generation *)
+    let asml = ImmOptim.optim asml in     (* Immediate optimization *)
     let b = RegAlloc.parcours asml in          (* Register allocation *)                     
     let arm = Generation.generate_asm_reg b in (* ARM generation *)
     set_arm_file arm out                       (* Saving result in file *)
@@ -192,10 +231,13 @@ let () =
     print_ast !input
   else if !type_only then
     type_check_only !input
-  else if !asml_only then
-    print_asml !input
   else if !test then
     print_test !input
+  else if !asml_only then
+    (if String.length !output = 0 then
+      print_asml !input None
+    else
+      print_asml !input (Some !output))
   else if String.length !output = 0 then
     show_help 1
   else
