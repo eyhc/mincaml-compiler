@@ -1,7 +1,7 @@
 open RegAlloc
 
 (* Blocks which will contain the generate ARM assembly code *)
-let header : string list ref = ref [".text"; ".global _start"; ""]
+let header : string list ref = ref [".text"; ".global main"; ""]
 let consts : string list ref = ref []
 let floats : string list ref = ref []
 
@@ -178,10 +178,21 @@ let rec generate_asm_regt : regt -> string list = function
         [Printf.sprintf "\tadd %s, fp, #%s" s a]
       else
         [Printf.sprintf "\tldr r12, =#%s" a; Printf.sprintf "\tadd %s, fp, r12" s]
-    | MemGet (s1, adr) -> [Printf.sprintf "\tldr %s, [%s, #%s]" s s1 adr]
+    | MemGet (s1, adr, nb_params) -> 
+      if s1 = "%self" then
+        begin
+          let offset = ref 36 in
+          if nb_params > 4 then
+            offset := !offset + ((nb_params - 4) * 4);
+    
+          [Printf.sprintf "\tldr r12, [fp, #%d]" !offset;
+            Printf.sprintf "\tldr %s, [r12, #%s]" s adr]
+        end
+      else
+        [Printf.sprintf "\tldr %s, [%s, #%s]" s s1 adr]
     | Label l -> [Printf.sprintf "\tldr %s, =%s" s l]
     | Neg s1 -> [Printf.sprintf "\tneg %s, %s" s s1]
-    | Unit -> [Printf.sprintf "\tmov %s, #0" s]
+    | Unit -> []
     | _ -> assert false)
 | Exp exp ->
 (match exp with
@@ -391,8 +402,7 @@ and generate_epilogue =
   | [] ->
     ["\tadd sp, fp, #0"; "\tpop {fp, lr}"; "\tbx lr\n"]
 
-(* Function which will initialize the code generation process, 
-   it will also ensure that the main (_start) is always at the start of the ARM assembly file *)
+
 let generate_asm_reg (defs: letregdef list) : string list =
   match defs with
   | [] -> []
@@ -401,7 +411,7 @@ let generate_asm_reg (defs: letregdef list) : string list =
       | [] -> acc
       | hd :: tl ->
         match hd with
-        | Fun f when f.name = "_start" ->
+        | Fun f when f.name = "main" ->
           let asm_hd = generate_asm_fun_internal f in
           generate_asm_internal (asm_hd @ acc) tl
         | Fun f ->

@@ -17,7 +17,7 @@ type reg_expr =
   | CallClo of Id.l * int
   | If of Id.l * (Id.t*reg_expr) * regt list * regt list
   | Reg of Id.t
-  | MemGet of Id.t * Id.t
+  | MemGet of Id.t * Id.t * int
   | Adresse of Id.t
   | Label of Id.t
   | Unit
@@ -253,7 +253,7 @@ let store_load intervals body var_to_register var_in_stack list_params =
            reg_available := !reg_available @ [r];
            (try
               let adr = Hashtbl.find var_in_stack v in
-              if not (is_pos_adr adr) then begin
+              if (is_pos_adr adr) then begin
                 Hashtbl.add var_in_stack v adr end
               else begin
                 body := !body @ [Store ((Reg r), adr)];
@@ -371,23 +371,33 @@ let parcours asml =
         let r_var = Hashtbl.find var_to_register var in
         Hashtbl.add var_in_stack var adr;
         bd := !bd @ [Store (Reg r_var, adr)];
+        Hashtbl.remove var_to_register var;
+        reg_available := !reg_available @ [r_var];
         parcours_asmt exp bd var_to_register var_in_stack list_params;
     | LET (var1, MEMGET (var, Const n), exp) ->
-      let active = get_intervals_i asmt var_to_register list_params in
-      store_load active bd var_to_register var_in_stack list_params;
-      let r = Hashtbl.find var_to_register var1 in
-      let r_var = ref "" in
-      if var = "%self" then begin
-        r_var := "r12" ;
-        let r_self = Hashtbl.find var_to_register "%self" in
-        Hashtbl.remove var_to_register "%self";
-        reg_available := !reg_available @ [r_self];
-      end
-      else 
-        r_var := Hashtbl.find var_to_register var ;
-      let offset = "-" ^ string_of_int (n)  in
-      bd := !bd @ [Let (r, MemGet (!r_var, offset))];
-      parcours_asmt exp bd var_to_register var_in_stack list_params; 
+        let active = get_intervals_i asmt var_to_register list_params in
+        store_load active bd var_to_register var_in_stack list_params;
+        let r = Hashtbl.find var_to_register var1 in
+        let r_var = ref "" in
+        if var = "%self" then begin
+          r_var := "%self" ;
+          let r_self = Hashtbl.find var_to_register "%self" in
+          Hashtbl.remove var_to_register "%self";
+          reg_available := !reg_available @ [r_self];
+        end
+        else 
+          r_var := Hashtbl.find var_to_register var;
+        let offset = "-" ^ string_of_int (n)  in
+        bd := !bd @ [Let (r, MemGet (!r_var, offset, List.length list_params))];
+        parcours_asmt exp bd var_to_register var_in_stack list_params; 
+    | LET (var1, LABEL s, exp) ->
+        let active = get_intervals_i asmt var_to_register list_params in
+        store_load active bd var_to_register var_in_stack list_params;
+        let r = Hashtbl.find var_to_register var1 in
+        bd := !bd @ [Let (r, Label (s))];
+        Hashtbl.remove var_to_register var1;
+        reg_available := !reg_available @ [r];
+        parcours_asmt exp bd var_to_register var_in_stack list_params;
     | LET (var1, var2, exp) ->
         let active = get_intervals_i asmt var_to_register list_params in
         store_load active bd var_to_register var_in_stack list_params;
@@ -399,11 +409,10 @@ let parcours asml =
              let next_adr = (int_of_string adr) - 4 in
              Hashtbl.add var_in_stack var1 adr;
              bd := !bd @ [Let (r, Adresse (string_of_int next_adr)); Store (Reg r, adr)];
+             bd := !bd @ [Push (r)];
              Hashtbl.remove var_to_register var1;
              reg_available := !reg_available @ [r];
-         | LABEL s ->
-             let adr = calcul_adr var_in_stack list_params in
-             bd := !bd @ [Let (r, Label (s))];
+             
          | _ ->
              Hashtbl.remove var_to_register var1;
              reg_available := !reg_available @ [r];
@@ -489,7 +498,7 @@ let parcours asml =
         reg_available := registers ;
         fill_var_to_register active var_to_register;
         let new_func : reg_function = {
-          name = "_start";
+          name = "main";
           body = !(parcours_asmt hd (ref []) var_to_register var_in_stack []) @ [Exp (Call ("_min_caml_exit", 0))];
         } in
         new_body:= !new_body @ [Fun new_func];
