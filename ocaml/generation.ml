@@ -1,26 +1,33 @@
 open RegAlloc
 
+(* Blocks which will contain the generate ARM assembly code *)
 let header : string list ref = ref [".text"; ".global _start"; ""]
 let consts : string list ref = ref []
 let floats : string list ref = ref []
 
+(* Label counters *)
 let if_label_counter = ref 0
 let num_label_counter = ref 0
 
+(* A stack which will keep track of the current sp value in case we need to update the SP *)
 let sp_values : int list ref = ref []
 
+(* A Boolean which will be 1 if we have parameters pushed on the stack, else 0 *)
 let pushed_vars : int ref = ref 0
 
+(* Generates a label for an if block *)
 let generate_if_label () =
   let label = "l" ^ string_of_int !if_label_counter in
   if_label_counter := !if_label_counter + 1;
   label
 
+(* Generate a label for large constants *)
 let generate_num_label () =
   let label = "const_" ^ string_of_int !num_label_counter in
   num_label_counter := !num_label_counter + 1;
   label
-   
+
+(* Function which will convert the ASML to ARM assembly *)
 let rec generate_asm_regt : regt -> string list = function
 | Let (s, expr) ->
   (match expr with
@@ -326,6 +333,8 @@ let rec generate_asm_regt : regt -> string list = function
   []
 | _ -> assert false
 
+(* Function which will calculate the prologue SP value of a function,
+  and start the code generation of the function's body *)
 and generate_asm_fun_internal : reg_function -> string list = fun { name; body } ->
   let rec extract_negative_sizes_regt : regt -> int list = function
   | Let (_, If (_, _, rts1, rts2)) | Exp (If (_, _, rts1, rts2)) ->
@@ -363,6 +372,7 @@ and generate_asm_fun_internal : reg_function -> string list = fun { name; body }
   @ List.concat (List.map generate_asm_regt body)
   @ generate_epilogue
 
+(* Generates the prologue *)
 and generate_prologue size =
   if size <= 255 then
     ["\tpush {fp, lr}"; "\tadd fp, sp, #0"; "\tsub sp, sp, #" ^ string_of_int size]
@@ -372,6 +382,7 @@ and generate_prologue size =
     ["\tpush {fp, lr}"; "\tadd fp, sp, #0"; "\tldr sp, " ^ label;
                 "\tsub sp, fp, sp"]
   
+(* Generates the epilogue *)
 and generate_epilogue =
   match !sp_values with
   | _ :: rest ->
@@ -380,7 +391,8 @@ and generate_epilogue =
   | [] ->
     ["\tadd sp, fp, #0"; "\tpop {fp, lr}"; "\tbx lr\n"]
 
-
+(* Function which will initialize the code generation process, 
+   it will also ensure that the main (_start) is always at the start of the ARM assembly file *)
 let generate_asm_reg (defs: letregdef list) : string list =
   match defs with
   | [] -> []
