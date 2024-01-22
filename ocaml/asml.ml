@@ -457,9 +457,9 @@ let rec string_exp (e:expr) =
   let rec string_letdef (l:letdef) : string =
     match l with
     | Main asmt -> sprintf "\nMain (%s)" (string_asmt asmt)
-    | LetFloat(l, f) -> sprintf "\nLetFloat (%f)" f
+    | LetFloat(l, f) -> sprintf "\nLetFloat (\"%s\", %f)" l f
     | LetLabel (l, args, asmt) -> 
-      sprintf "\nLetLabel(\"%s\", [%s], %s)"
+      sprintf "\nLetLabel (\"%s\", [%s], %s)"
       (Id.to_string l)
       (Syntax.infix_to_string (fun x -> sprintf "\"%s\"" (Id.to_string x)) args ";")
       (string_asmt asmt)
