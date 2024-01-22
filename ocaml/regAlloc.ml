@@ -55,6 +55,7 @@ let print_free my_list =
 
 (* Nombres de registres pour les variables locales *)
 let num_registers = 7
+let num_registers_float = 30
 (* Registres *)
 let registers = ["r4";"r5";"r6";"r7";"r8";"r9";"r10"];;
 (* Registres disponible *)
@@ -65,8 +66,11 @@ let register_param = ["r0";"r1";"r2";"r3"];;
 let register_store_param = "r12";;
 (* hashmap de `nom de float` -> registre *)
 let float_to_reg = Hashtbl.create 0;;
+let float = Hashtbl.create 0;;
 (* Registres pour float *)
-let float_reg = ref ["s0"; "s1"; "s2"; "s3"; "s4"; "s5"; "s6"; "s7"; "s8"; "s9"; "s10"; "s11"; "s12"; "s13"; "s14"; "s15"; "s16"; "s17"; "s18"; "s19"; "s20"; "s21"; "s22"; "s23"; "s24"; "s25"; "s26"; "s27"; "s28"; "s29"; "s30"; "s31"];;
+let float_reg_available = ref [ "s1"; "s2"; "s3"; "s4"; "s5"; "s6"; "s7"; "s8"; "s9"; "s10"; "s11"; "s12"; "s13"; "s14"; "s15"; "s16"; "s17"; "s18"; "s19"; "s20"; "s21"; "s22"; "s23"; "s24"; "s25"; "s26"; "s27"; "s28"; "s29"; "s30"; "s31"];;
+let register_float = [ "s1"; "s2"; "s3"; "s4"; "s5"; "s6"; "s7"; "s8"; "s9"; "s10"; "s11"; "s12"; "s13"; "s14"; "s15"; "s16"; "s17"; "s18"; "s19"; "s20"; "s21"; "s22"; "s23"; "s24"; "s25"; "s26"; "s27"; "s28"; "s29"; "s30"; "s31"];;
+
 let new_sizes = Hashtbl.create 0;;
 
 
@@ -84,7 +88,6 @@ let quatre_premiers_elem list_params =
   fonc list_params 0
 ;;
 
-
 let calcul_adr var_in_stack list_params =
 (* Retourne len(param) - 4 ou 0 si negatif *)
   let nb_param lst =
@@ -96,7 +99,7 @@ let calcul_adr var_in_stack list_params =
 ;;
 
 (* Supprime un element d'une liste ref *)
-let remove_e_list_ref e =
+let remove_e_list_ref e available_reg =
   let rec r_lr list =
     match list with
     | hd :: ll ->
@@ -105,7 +108,19 @@ let remove_e_list_ref e =
         else
           hd :: r_lr ll
     | [] -> []
-  in reg_available := (r_lr !reg_available)
+  in available_reg := (r_lr !available_reg)
+;;
+(* Supprime un element d'une liste ref *)
+let remove_e_list_ref2 e list_ref =
+  let rec r_lr list =
+    match list with
+    | hd :: ll ->
+        if e = hd then
+          r_lr ll
+        else
+          hd :: r_lr ll
+    | [] -> []
+  in list_ref := (r_lr !list_ref)
 ;;
 
 (* Retourne une liste de var qui doivent etre store car presente dans la hashmap mais pas dans la liste active *)
@@ -131,7 +146,7 @@ let fill_var_to_register intervals var_to_register =
     | _ when n >= num_registers -> ()
     | var :: tail ->
         Hashtbl.add var_to_register var ("r" ^ string_of_int (n + 4));
-        remove_e_list_ref ("r" ^ string_of_int (n + 4));
+        remove_e_list_ref ("r" ^ string_of_int (n + 4)) reg_available;
         add_hashmap (n + 1) tail
   in
   add_hashmap 0 !intervals;;
@@ -152,28 +167,37 @@ let create_copy_hash hashmap =
       Hashtbl.add newh key value;
     ) hashmap; newh
 
+let vider_hash hashmap = 
+  Hashtbl.iter (fun key _ ->
+      Hashtbl.remove hashmap key;
+    ) hashmap;;
+
+  
 (* Met a jour les registres disponible en fonction de la hashmap des variables associées aux registres *)
-let update_reg_available var_to_register =
-  reg_available := registers;
+let update_reg_available var_to_register available_reg is_float=
+  if is_float = 0 then
+    available_reg:= registers
+  else
+    available_reg:= register_float ;
   Hashtbl.iter (fun key value ->
-      remove_e_list_ref value;
+      remove_e_list_ref value available_reg;
     ) var_to_register;
 ;;
 
 (* Parcours la liste de variable a ajouter dans les registres et load si la var est deja presente dans la pile *)
-let rec active_add act_add bd var_to_register var_in_stack =
+let rec active_add act_add bd var_to_register var_in_stack available_reg is_float=
   match act_add with
   | hd :: tl ->
       (try Hashtbl.find var_to_register hd; () with e ->
-         update_reg_available var_to_register;
-         let r = List.hd !reg_available in
+         update_reg_available var_to_register available_reg is_float;
+         let r = List.hd !available_reg in
          (try
             let value = Hashtbl.find var_in_stack hd in
             bd:= !bd @ [Load (value, Reg r)];
           with e -> ());
-         remove_e_list_ref r;
+         remove_e_list_ref r available_reg;
          Hashtbl.add var_to_register hd r;
-         active_add tl bd var_to_register var_in_stack)
+         active_add tl bd var_to_register var_in_stack available_reg is_float)
   | [] -> ()
 
 (* Parcours un asml et donne les 7 prochaines variable utilisées 
@@ -245,9 +269,74 @@ let get_intervals_i asml var_to_register list_param=
   let l = list in l
 ;;
 
+let get_intervals_i_float asml float_to_reg list_param=
+  let list = ref [] in
+  let rec i_intervals_asmt asmt =
+    match asmt with
+    | LET (var1, var2, exp) ->
+        if not ((List.length !list) = num_registers_float) then begin
+          i_intervals_string var1;
+          i_intervals_expr var2;
+          i_intervals_asmt exp;
+        end
+    | EXP expr -> i_intervals_expr expr;
+
+  and i_intervals_string var =
+    if not ((List.length !list) = num_registers_float) then begin
+      if not (List.exists (fun v -> v = var) !list) && not (List.exists (fun v -> v = var) (quatre_premiers_elem list_param))then
+        list := !list @ [var];
+    end
+  and i_intervals_id_or_imm id_or_im =
+    match id_or_im with
+    | Var v -> i_intervals_string v
+    | Const _ -> ()
+
+  and i_intervals_expr expr =
+    match expr with
+    | VAL v ->
+        i_intervals_id_or_imm v
+    | FNEG s ->
+        i_intervals_string s
+    | FADD (s1, s2) | FSUB (s1, s2) | FMUL (s1, s2) | FDIV (s1, s2) ->
+        i_intervals_string s1;
+        i_intervals_string s2;
+    | NOP -> ()
+    | CALL (s,hd::tl) ->
+        i_intervals_string hd;
+        i_intervals_expr (CALL (s,tl))
+    | CALL (_, []) -> ()
+    | CALLCLO (s,hd::tl) ->
+        i_intervals_string s;
+        i_intervals_string hd;
+        i_intervals_expr (CALL (s,tl))
+    | CALLCLO (_, []) -> ()
+    | IFFEQUAL ((s1, s2) , asmt1, asmt2) | IFFLE ((s1, s2) , asmt1, asmt2) ->
+        i_intervals_string s1;
+        i_intervals_string s2;
+        get_keys float_to_reg
+    | MEMASSIGN (_, _,s2) ->
+        i_intervals_string s2;
+    | MEMGET (s,i_o_s) ->
+        i_intervals_string s;
+        i_intervals_id_or_imm i_o_s;
+    | NEW i_o_s ->
+        i_intervals_id_or_imm i_o_s;
+    | _ when (List.length !list) = num_registers_float -> ()
+    | _ -> ()
+
+  and get_keys hashtable =
+    Hashtbl.iter (fun key _ ->
+        i_intervals_string key
+      ) hashtable;
+
+  in
+  i_intervals_asmt asml ;
+  let l = list in l
+;;
+
 (* Recupere une liste de var a ajouter dans les registres et a store, puis parcours la liste de variable a store,
 a chaque store on ajoute une autre variable a se registres. *)
-let store_load intervals body var_to_register var_in_stack list_params =
+let store_load intervals body var_to_register var_in_stack list_params available_reg is_float =
   let rec parcours_store list_store active_a_ajouter =
     match list_store with
     | (v,r) ::  tl ->
@@ -256,7 +345,7 @@ let store_load intervals body var_to_register var_in_stack list_params =
         end
         else
           (Hashtbl.remove var_to_register v;
-           reg_available := !reg_available @ [r];
+           available_reg:= !available_reg @ [r];
            (try
               let adr = Hashtbl.find var_in_stack v in
               if (is_pos_adr adr) then begin
@@ -271,14 +360,14 @@ let store_load intervals body var_to_register var_in_stack list_params =
            (try
               let var = List.hd active_a_ajouter in
               Hashtbl.add var_to_register var r;
-              remove_e_list_ref r;
+              remove_e_list_ref r available_reg;
               (try
                  let value = Hashtbl.find var_in_stack var in
                  body := !body @ [Load (value, Reg r)];
                with e -> ());
             with e -> ());
            parcours_store tl (try (List.tl active_a_ajouter) with Failure tl -> []));
-    | [] -> active_add active_a_ajouter body var_to_register var_in_stack
+    | [] -> active_add active_a_ajouter body var_to_register var_in_stack available_reg is_float
   in
   let store = var_not_in_list var_to_register !intervals in
   let active_a_ajouter = var_not_in_hash var_to_register !intervals in
@@ -362,90 +451,109 @@ let init_var_to_register_func var_to_register var_in_stack list_param =
   parcours_param list_param 0
 ;;
 
+(* Fonction qui calcul la liste des prochaines variables utilisées, et store load
+   et renvoie un registre pour la variable var1 *)
+let actualisation_registres asmt hash list_params bd var_in_stack var1 is_float=
+  if is_float = 0 then begin 
+    let active = get_intervals_i asmt hash list_params in
+    store_load active bd hash var_in_stack list_params reg_available is_float;
+    let r = Hashtbl.find hash var1 in
+    r
+  end 
+  else begin 
+    let active = get_intervals_i_float asmt hash list_params in
+    store_load active bd hash var_in_stack list_params float_reg_available is_float;
+    let r = Hashtbl.find hash var1 in
+    r
+  end;;
+
+(* Fonction qui supprime une variable de la hashmap des registres et rend son registre disponible *)
+let remove_hash_register hash var r =
+  Hashtbl.remove hash var;
+  reg_available := !reg_available @ [r];;
+
+(* Fonction qui calcul une adresse et l'ajoute dans la pile *)
+let add_in_stack var_in_stack list_params var =
+  let adr = calcul_adr var_in_stack list_params in
+  Hashtbl.add var_in_stack var adr ;
+  adr ;;
+  
 (* Parcours l'asml et renvoie une liste de letregdef *)
 let parcours asml =
   let new_body = ref [] in
   let rec parcours_asmt asmt bd var_to_register var_in_stack list_params =
     match asmt with
     | LET (var1, (MEMASSIGN (tuple, _, var)), exp) ->
-        let active = get_intervals_i asmt var_to_register list_params in
-        store_load active bd var_to_register var_in_stack list_params;
-        let r = Hashtbl.find var_to_register var1 in
-        Hashtbl.remove var_to_register var1;
-        reg_available := !reg_available @ [r];
-        let adr = calcul_adr var_in_stack list_params in
-        let r_var = Hashtbl.find var_to_register var in
-        Hashtbl.add var_in_stack var adr;
+        let r = actualisation_registres asmt var_to_register list_params bd var_in_stack var1 0 in
+        remove_hash_register var_to_register var1 r;
+        let adr = add_in_stack var_in_stack list_params var in
+        let r_var = Hashtbl.find var_to_register var in 
         bd := !bd @ [Store (Reg r_var, adr)];
-        Hashtbl.remove var_to_register var;
-        reg_available := !reg_available @ [r_var];
+        remove_hash_register var_to_register var r_var;
         parcours_asmt exp bd var_to_register var_in_stack list_params;
     | LET (var1, MEMGET (var, Const n), exp) ->
-        let active = get_intervals_i asmt var_to_register list_params in
-        store_load active bd var_to_register var_in_stack list_params;
-        let r = Hashtbl.find var_to_register var1 in
-        let r_var = ref "" in
-        if var = "%self" then begin
-          r_var := "%self" ;
-          let r_self = Hashtbl.find var_to_register "%self" in
-          Hashtbl.remove var_to_register "%self";
-          reg_available := !reg_available @ [r_self];
-        end
-        else 
-          r_var := Hashtbl.find var_to_register var;
-        let offset = "-" ^ string_of_int (n)  in
-        bd := !bd @ [Let (r, MemGet (!r_var, offset, List.length list_params))];
-        parcours_asmt exp bd var_to_register var_in_stack list_params; 
+        (try 
+           let r_var = Hashtbl.find float var in
+           let r = actualisation_registres asmt float_to_reg list_params bd var_in_stack var1 1 in 
+           let offset = "-" ^ string_of_int (n)  in
+           bd := !bd @ [Let (r, MemGet (r_var, offset,List.length list_params ))];
+           parcours_asmt exp bd float_to_reg var_in_stack list_params; 
+         with e -> 
+           let r = actualisation_registres asmt var_to_register list_params bd var_in_stack var1 0 in
+           let r_var = ref "" in
+           if var = "%self" then begin
+             r_var := "%self" ;
+             let r_self = Hashtbl.find var_to_register var in
+             remove_hash_register var_to_register var r_self;
+           end
+           else 
+             r_var := Hashtbl.find var_to_register var;
+           let offset = "-" ^ string_of_int (n)  in
+           bd := !bd @ [Let (r, MemGet (!r_var, offset, List.length list_params))];
+           parcours_asmt exp bd var_to_register var_in_stack list_params); 
     | LET (var1, LABEL s, exp) ->
-        let active = get_intervals_i asmt var_to_register list_params in
-        store_load active bd var_to_register var_in_stack list_params;
-        let r = Hashtbl.find var_to_register var1 in
-        bd := !bd @ [Let (r, Label (s))];
-        Hashtbl.remove var_to_register var1;
-        reg_available := !reg_available @ [r];
-        parcours_asmt exp bd var_to_register var_in_stack list_params;
+        (try 
+           Hashtbl.find float s;
+           let r = List.hd !float_reg_available in
+           remove_e_list_ref2 r float_reg_available;
+           Hashtbl.add float_to_reg var1 r;
+           Hashtbl.add float var1 r;
+           bd := !bd @ [Let (r, Label (s))];
+           parcours_asmt exp bd float_to_reg var_in_stack list_params
+         with e -> 
+           let r = actualisation_registres asmt var_to_register list_params bd var_in_stack var1 0 in
+           bd := !bd @ [Let (r, Label (s))];
+           remove_hash_register var_to_register var1 r;
+           parcours_asmt exp bd var_to_register var_in_stack list_params);
     | LET (var1, var2, exp) ->
-        let active = get_intervals_i asmt var_to_register list_params in
-        store_load active bd var_to_register var_in_stack list_params;
-        let r = Hashtbl.find var_to_register var1 in
-
+        let r = actualisation_registres asmt var_to_register list_params bd var_in_stack var1 0 in 
         (match var2 with 
          | NEW (Const n) ->
-             let adr = calcul_adr var_in_stack list_params in
+             let adr = add_in_stack var_in_stack list_params var1 in
              let next_adr = (int_of_string adr) - 4 in
-             Hashtbl.add var_in_stack var1 adr;
              bd := !bd @ [Let (r, Adresse (string_of_int next_adr)); Store (Reg r, adr)];
              bd := !bd @ [Push (r)];
-             Hashtbl.remove var_to_register var1;
-             reg_available := !reg_available @ [r];
+             remove_hash_register var_to_register var1 r;
              Hashtbl.add new_sizes var1 (string_of_int n)
          | _ ->
-             Hashtbl.remove var_to_register var1;
-             reg_available := !reg_available @ [r];
-             let expr = parcours_expr var2 bd var_to_register active var_in_stack list_params in
+             remove_hash_register var_to_register var1 r;
+             let expr = parcours_expr var2 bd var_to_register  var_in_stack list_params in
              Hashtbl.add var_to_register var1 r;
-             remove_e_list_ref r;
+             remove_e_list_ref r reg_available;
              bd := !bd @ [Let (r, expr)];
         );
         parcours_asmt exp bd var_to_register var_in_stack list_params;
     | EXP expr ->
-        (* match expr with 
-        | VAL (Var t) ->
-            (*(try let size = Hashtbl.find new_sizes t ; 
-                  
-             with e -> *)
-              
-        | _ ->  *)
         let active = get_intervals_i asmt var_to_register list_params in
-        store_load active bd var_to_register var_in_stack list_params;
-        bd := !bd @ [Exp (parcours_expr expr bd var_to_register active var_in_stack list_params )];
+        store_load active bd var_to_register var_in_stack list_params reg_available 0;
+        bd := !bd @ [Exp (parcours_expr expr bd var_to_register  var_in_stack list_params )];
         bd
   and parcours_id_or_im id_or_im var_to_register =
     match id_or_im with
     | Const n -> Int n
     | Var r ->  Reg (Hashtbl.find var_to_register r)
 
-  and parcours_expr expr bd var_to_register active var_in_stack list_params  =
+  and parcours_expr expr bd var_to_register var_in_stack list_params  =
     match expr with
     | VAL v ->
         parcours_id_or_im v var_to_register
@@ -455,6 +563,16 @@ let parcours asml =
         Add (Hashtbl.find var_to_register s, parcours_id_or_im id_or_im var_to_register)
     | SUB (s, id_or_im) ->
         Sub (Hashtbl.find var_to_register s, parcours_id_or_im id_or_im var_to_register)
+    | FNEG s ->
+        Fneg (Hashtbl.find float_to_reg s)
+    | FADD (s1, s2) ->
+        Fadd (Hashtbl.find float_to_reg s1, Hashtbl.find float_to_reg s2)
+    | FSUB (s1, s2) ->
+        Fsub (Hashtbl.find float_to_reg s1, Hashtbl.find float_to_reg s2)
+    | FMUL (s1, s2) ->
+        Fmul (Hashtbl.find float_to_reg s1, Hashtbl.find float_to_reg s2)
+    | FDIV (s1, s2) ->
+        Fdiv (Hashtbl.find float_to_reg s1, Hashtbl.find float_to_reg s2)
     | NOP -> Unit
     | CALL (s, ls) ->
         store_to_regs_params ls bd var_to_register var_in_stack;
@@ -495,10 +613,10 @@ let parcours asml =
     let var_to_register_asmt = create_copy_hash var_to_register in
     let active = get_intervals_i asmt var_to_register_asmt list_params in
     let body_asmt = ref [] in
-    store_load active body_asmt var_to_register_asmt var_in_stack list_params;
+    store_load active body_asmt var_to_register_asmt var_in_stack list_params reg_available 0;
     let regt = parcours_asmt asmt body_asmt var_to_register_asmt var_in_stack list_params  in
     load_if var_to_register var_to_register_asmt body_asmt var_in_stack;
-    update_reg_available var_to_register;
+    update_reg_available var_to_register reg_available 0;
     body_asmt
 
 
@@ -509,6 +627,7 @@ let parcours asml =
         let var_in_stack = Hashtbl.create 0 in
         let active = get_intervals_i hd var_to_register [] in
         reg_available := registers ;
+        float_reg_available := register_float;
         fill_var_to_register active var_to_register;
         let new_func : reg_function = {
           name = "main";
@@ -518,13 +637,16 @@ let parcours asml =
         parcours_asml_list tl
     | LetFloat (label,fl) :: tl -> 
         new_body := !new_body @ [LetFloatReg (label, (string_of_float fl))];
-        Hashtbl.add float_to_reg label "";
+        Hashtbl.add float label "";
         parcours_asml_list tl
     | LetLabel (fun_name, list_params, hd) :: tl ->
         let var_to_register = Hashtbl.create 0 in
         let var_in_stack = Hashtbl.create 0 in
         num_params := (List.length list_params) :: !num_params;
         reg_available := registers ;
+        float_reg_available := register_float;
+        vider_hash float_to_reg;
+        print_hashtable float_to_reg;
         let body_func = ref [] in
         init_var_to_register_func var_to_register var_in_stack list_params;
 
@@ -551,7 +673,6 @@ let parcours asml =
   in
   parcours_asml_list asml;
 ;;
-
 let rec print_reg_expr reg_expr =
   match reg_expr with
   | Int i -> Printf.printf "(Int : %d)" i
