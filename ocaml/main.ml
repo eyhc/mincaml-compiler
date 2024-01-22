@@ -99,18 +99,18 @@ let print_knorm ast =
   Typechecker.type_check ast;
   let res = Knorm.normalize ast in
     if !show_type then
-      print_endline (Knorm.to_string res)
-    else
       print_endline (Knorm.to_string_with_type res)
+    else
+      print_endline (Knorm.to_string res)
 
 let print_alpha ast =
   Typechecker.type_check ast;
   let res = Knorm.normalize ast in
   let res = Alpha.conversion res in
     if !show_type then
-      print_endline (Knorm.to_string res)
-    else
       print_endline (Knorm.to_string_with_type res)
+    else
+      print_endline (Knorm.to_string res)
 
 let print_let_reduc ast =
   Typechecker.type_check ast;
@@ -118,9 +118,9 @@ let print_let_reduc ast =
   let res = Alpha.conversion res in
   let res = Reduction.reduction res in
     if !show_type then
-      print_endline (Knorm.to_string res)
-    else
       print_endline (Knorm.to_string_with_type res)
+    else
+      print_endline (Knorm.to_string res)
 
 let print_optim ast =
   Typechecker.type_check ast;
@@ -132,9 +132,9 @@ let print_optim ast =
   let res = Constant.folding res in
   let res = Elim.elim_definition res in
     if !show_type then
-      print_endline (Knorm.to_string res)
-    else
       print_endline (Knorm.to_string_with_type res)
+    else
+      print_endline (Knorm.to_string res)
 
 let print_closure ast =
   Typechecker.type_check ast;
