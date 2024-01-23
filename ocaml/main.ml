@@ -182,7 +182,7 @@ let print_asml f_in f_out =
     let asml = Asml.generation ast in    (* ASML generation *)
     let asml = ImmOptim.optim asml in    (* Immediate optimization *)
     (match f_out with
-    | None -> print_endline (Asml.string_struct asml)
+    | None -> print_endline (Asml.to_string asml)
     | Some out -> set_asml_file asml out
     )
 
