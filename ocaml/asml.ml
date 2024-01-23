@@ -91,9 +91,6 @@ let floatsdef: letdef list ref = ref []
 (* La définition des fonctions du programme mais non converties en ASML  *)
 let funsdef: Closure.fundef list ref = ref []
 
-(* L'ensemble des variables qui sont utilisées dans un Get *)
-let get_vars: VarSet.t ref = ref VarSet.empty
-
 let get_fdef (name: Id.t): Closure.fundef =
   List.find (fun (x: Closure.fundef) -> fst x.label = name) !funsdef
 
@@ -239,9 +236,6 @@ and generation_asmt (env: VarSet.t) (a:Closure.t) : asmt =
   | Let ((x, t), e1, e2) -> 
       let env' = VarSet.add (x, t) env in
       (match e1 with
-      | Int(i) -> 
-          let value = if List.exists (fun (y, z) -> y = x) (VarSet.elements !get_vars) then VAL(Const(i * 4)) else VAL(Const(i)) in
-          LET(x, value, generation_asmt env' e2)
       | Tuple(vars) -> generation_tuple x vars (generation_asmt env' e2)
       | Array(size, default) -> 
           let at = snd (List.find (fun (y, z) -> y = default) (VarSet.elements env)) in
@@ -284,16 +278,6 @@ let rec generation_letdef (a:Closure.fundef) : letdef =
   )
 
 (* 
-  Trouve l'ensemble des variables qui sont utilisées dans un Get comme indice
-*)
-let rec find_get_vars (env: VarSet.t) (exp: Closure.t): VarSet.t =
-  match exp with
-  | IfEq(a, b, th, els) | IfLE(a, b, th, els) -> VarSet.union (find_get_vars env th) (find_get_vars env els)
-  | Let((id, t), value, next) -> let env' = VarSet.add (id, t) env in VarSet.union (find_get_vars env' value) (find_get_vars env' next)
-  | Get(a, b) -> let t = List.find (fun (x, y) -> x = b) (VarSet.elements env) in VarSet.singleton t
-  | _ -> VarSet.empty
-
-(* 
   Génère le code asml équivalent au programme en paramètre
   Paramètres:
   - ast -> l'ast du programme
@@ -304,8 +288,7 @@ let rec generation (ast:Closure.t) : asml =
   | Prog (fcts, main) -> 
     floatsdef := [];
     funsdef := fcts;
-    let funs = List.map (fun (x: Closure.fundef) -> get_vars := find_get_vars VarSet.empty x.code; generation_letdef x) fcts in
-    get_vars := find_get_vars VarSet.empty main;
+    let funs = List.map generation_letdef fcts in
     let main = Main(generation_asmt VarSet.empty main) in
     !floatsdef @ funs @ [main]
   | _ -> failwith "Not correct closure form" 
@@ -379,10 +362,10 @@ let rec string_exp (e:expr) =
   | ADD (v1,v2) -> sprintf "ADD (\"%s\", %s)" (Id.to_string v1) (string_id v2)
   | SUB (v1,v2) -> sprintf "SUB (\"%s\", %s)" (Id.to_string v1) (string_id v2)
   | FNEG v -> sprintf "FNEG (\"%s\")" (Id.to_string v)
-  | FADD (v1,v2) -> sprintf "FADD (\"%s\", \"%s\")" (Id.to_string v1) (Id.to_string v2)
-  | FSUB (v1,v2) -> sprintf "FSUB (\"%s\", \"%s\")" (Id.to_string v1) (Id.to_string v2)
-  | FMUL (v1,v2) -> sprintf "FMUL (\"%s\", \"%s\")" (Id.to_string v1) (Id.to_string v2)
-  | FDIV (v1,v2) -> sprintf "FDIV (\"%s\", \"%s\")" (Id.to_string v1) (Id.to_string v2)
+  | FADD (v1,v2) -> sprintf "FADD (\"%s\", %s)" (Id.to_string v1) (Id.to_string v2)
+  | FSUB (v1,v2) -> sprintf "FSUB (\"%s\", %s)" (Id.to_string v1) (Id.to_string v2)
+  | FMUL (v1,v2) -> sprintf "FMUL (\"%s\", %s)" (Id.to_string v1) (Id.to_string v2)
+  | FDIV (v1,v2) -> sprintf "FDIV (\"%s\", %s)" (Id.to_string v1) (Id.to_string v2)
   | NEW v -> sprintf "NEW (%s)" (string_id v)
   | MEMGET (v1,v2) -> sprintf "MEMGET (\"%s\", %s)" (Id.to_string v1) (string_id v2)
   | MEMASSIGN (v1,v2,v3) -> sprintf "(MEMASSIGN (\"%s\", %s, \"%s\"))" v1 (string_id v2) v3
@@ -417,9 +400,9 @@ let rec string_exp (e:expr) =
   let rec string_letdef (l:letdef) : string =
     match l with
     | Main asmt -> sprintf "\nMain (%s)" (string_asmt asmt)
-    | LetFloat(l, f) -> sprintf "\nLetFloat (\"%s\", %f)" l f
+    | LetFloat(l, f) -> sprintf "\nLetFloat (%f)" f
     | LetLabel (l, args, asmt) -> 
-      sprintf "\nLetLabel (\"%s\", [%s], %s)"
+      sprintf "\nLetLabel(\"%s\", [%s], %s)"
       (Id.to_string l)
       (Syntax.infix_to_string (fun x -> sprintf "\"%s\"" (Id.to_string x)) args ";")
       (string_asmt asmt)
