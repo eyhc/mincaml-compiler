@@ -2,7 +2,7 @@
 
 (* version *)
 let show_version () =
-  print_endline "MinCamlCompiler v0.2.2 - 22-01-2023";
+  print_endline "MinCamlCompiler v0.3 - 25-01-2024";
   exit 0
 
 (* Global variables for Arg's parser *)
@@ -124,7 +124,7 @@ let print_optim ast =
   Typechecker.type_check ast;
   let res = Knorm.normalize ast in
   let res = Alpha.conversion res in
-  let res = Beta.reduction res in 
+  let res = Beta.reduction res in
   let res = Reduction.reduction res in
   let res = Inline.expansion res in
   let res = Constant.folding res in

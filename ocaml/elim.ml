@@ -95,20 +95,20 @@ let elim_definition (ast:Knorm.knorm_t) : Knorm.knorm_t =
     | Let ((s,t), e1, e2) -> 
       (* here CAUTION of side effects *)
       let env' = (s, ref 0)::env in        
-        let e1' = elim e1 env env2 and e2' = elim e2 env' env2 in
-          if (env_get env' s) <> 0 || has_side_effects e1' env2 then 
-            Let((s,t), e1', e2')
+        let e2' = elim e2 env' env2 in
+          if (env_get env' s) <> 0 || has_side_effects e1 env2 then 
+            let e1' = elim e1 env env2 in Let((s,t), e1', e2')
           else e2'
 
     | LetRec (fd, e) -> 
       let env' = (fst fd.name, ref 0)::env in
-        let b = elim fd.body env env2 in
           let env22 = 
-            if has_side_effects b env2 then (fst fd.name)::env2 else env2
+            if has_side_effects fd.body env2 then (fst fd.name)::env2 else env2
           in 
             let e' = elim e env' env22 in
               if (env_get env' (fst fd.name)) <> 0 then
-                LetRec({name= fd.name; args=fd.args; body=b}, e')
+                let b = elim fd.body env env2 in
+                  LetRec({name= fd.name; args=fd.args; body=b}, e')
               else e'
 
     | LetTuple (l1, v, e) -> 
