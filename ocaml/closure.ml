@@ -140,9 +140,34 @@ let rec fun_free_vars (env: VarSet.t) (parent: Id.t * VarSet.t) (exp: Knorm.knor
 *)
 let convert (exp: Knorm.knorm_t): fundef list * t =
   let funs = ref [] in
+  let is_fun (f: Id.t): bool =
+    List.exists (fun x -> (fst x.label) = f) !funs || Typechecker.is_prefef_fun f
+  in
+  let find_fun (f: Id.t): fundef =
+    List.find (fun x -> fst x.label = f) !funs
+  in
   (* Convertit les noms des fonctions dans une liste d'arguments pour qu'ils soient des labels de fonction *)
   let convert_args (args: Id.t list): Id.t list =
-    List.map (fun x -> let label = genlabel x in if List.exists (fun y -> (fst y.label) = label) !funs then label else x) args
+    List.map (fun x -> let label = genlabel x in if is_fun label then label else x) args
+  in
+  (* Pour les apply il faut faire une conversion spéciale *)
+  let convert_apply ?(closure: Id.t = "") ?(id: Id.t = "") ?(e: t = Unit) (f: Id.t) (args: Id.t list) : t =
+    let c_args = convert_args args in
+    let renames = List.filter_map (fun x -> if is_fun x then Some(x, Id.genid ()) else None) c_args in
+    let c_args = List.map (fun x -> if List.exists (fun (y, z) -> x = y) renames then snd (List.find (fun (y, z) -> x = y) renames) else x) c_args in
+    let apply = if closure = "" then ApplyDir(f, c_args) else ApplyCls(closure, c_args) in
+    let next =
+      match e with
+      | Unit -> apply
+      | _ -> Let((id, snd (find_fun f).label), apply, e)
+    in
+    let rec add_f_args_cls (f_args: (Id.t * Id.t) list): t =
+      match f_args with
+      | [] -> next
+      | [(x,y)] -> let f = find_fun x in MakeCls((y, snd f.label), fst f.label, List.map fst f.frees, next)
+      | (x,y) :: tail -> let f = find_fun x in MakeCls((y, snd f.label), fst f.label, List.map fst f.frees, add_f_args_cls tail)
+    in
+    add_f_args_cls renames
   in
   (* 
     Fonction utilitaire pour convert
@@ -188,10 +213,9 @@ let convert (exp: Knorm.knorm_t): fundef list * t =
           let f = List.find (fun x -> (fst x.label) = (genlabel name)) !funs in
           if List.length f.frees > 0 then
             let new_id = Id.genid () in
-            MakeCls((new_id, t), genlabel name, List.map fst f.frees, 
-            Let((id, snd f.label), ApplyCls(new_id, convert_args args), worker env' next))
+            MakeCls((new_id, t), genlabel name, List.map fst f.frees, convert_apply ~closure:new_id ~id:id ~e:(worker env' next) (genlabel name) args)
           else
-            Let((id, t), ApplyDir(genlabel name, convert_args args), worker env' next)
+            convert_apply ~id:id ~e:(worker env' next) (genlabel name) args
       | Tuple(vars) -> Let((id, t), Tuple(vars), worker env' next)
       | Array(a, b) -> Let((id, t), Array(a, b), worker env' next)
       | _ -> Let((id, t), worker env value, worker env' next))
@@ -218,14 +242,14 @@ let convert (exp: Knorm.knorm_t): fundef list * t =
         if List.length f.frees > 0 then
           (* Fonction avec au moins une variable libre *)
           let id = Id.genid () in
-          MakeCls((id, Type.Unit), genlabel name, List.map fst f.frees, ApplyCls(id, convert_args args))
+          MakeCls((id, snd f.label), genlabel name, List.map fst f.frees, convert_apply ~closure:id (genlabel name) args)
         else
           (* Fonction sans variables libres *)
           ApplyDir(genlabel name, convert_args args)
     (* Appel d'une fonction prédéfinie (print_int par exemple) *)
-    | App(name, args) when Typechecker.is_prefef_fun name -> ApplyDir(name, convert_args args)
+    | App(name, args) when Typechecker.is_prefef_fun name -> convert_apply name args
     (* Appel d'une fonction dans une closure *)
-    | App(name, args) -> ApplyCls(name, convert_args args)
+    | App(name, args) -> convert_apply ~closure:name name args
     (* On place les déclarations de tableau dans des variables pour simplifier la génération de l'ASML *)
     | Array(a, b) ->
       let id = Id.genid () in
