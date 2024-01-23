@@ -29,6 +29,11 @@ Pour afficher uniquement l'asml :
 ocaml/mincamlc test.mml -asml
 ```
 
+Pour compiler le code asml :
+```sh
+ocaml/mincamlc test.mml -asml -o test.asml
+```
+
 Pour compiler vers ARM :
 ```sh
 ocaml/mincamlc test.mml -o test.s 
@@ -54,8 +59,11 @@ Pour lancer l'ensemble des scripts de tests, utiliser simplement `make test` dan
 
 ### Tests avec qemu
 
-```
+Pour exécuter un fichier assembleur généré précédemment par appel à mincamlc et enregistré dans le dossier `ocaml/`, faire :
+
+```sh
 cp ocaml/*.s ARM/
+cd ARM/
 make test
 ```
 

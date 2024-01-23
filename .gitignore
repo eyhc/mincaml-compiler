@@ -41,5 +41,7 @@ setup.log
 *.out
 */*.out
 
+*.arm
+
 *.run
 */*.run

@@ -362,10 +362,10 @@ let rec string_exp (e:expr) =
   | ADD (v1,v2) -> sprintf "ADD (\"%s\", %s)" (Id.to_string v1) (string_id v2)
   | SUB (v1,v2) -> sprintf "SUB (\"%s\", %s)" (Id.to_string v1) (string_id v2)
   | FNEG v -> sprintf "FNEG (\"%s\")" (Id.to_string v)
-  | FADD (v1,v2) -> sprintf "FADD (\"%s\", %s)" (Id.to_string v1) (Id.to_string v2)
-  | FSUB (v1,v2) -> sprintf "FSUB (\"%s\", %s)" (Id.to_string v1) (Id.to_string v2)
-  | FMUL (v1,v2) -> sprintf "FMUL (\"%s\", %s)" (Id.to_string v1) (Id.to_string v2)
-  | FDIV (v1,v2) -> sprintf "FDIV (\"%s\", %s)" (Id.to_string v1) (Id.to_string v2)
+  | FADD (v1,v2) -> sprintf "FADD (\"%s\", \"%s\")" (Id.to_string v1) (Id.to_string v2)
+  | FSUB (v1,v2) -> sprintf "FSUB (\"%s\", \"%s\")" (Id.to_string v1) (Id.to_string v2)
+  | FMUL (v1,v2) -> sprintf "FMUL (\"%s\", \"%s\")" (Id.to_string v1) (Id.to_string v2)
+  | FDIV (v1,v2) -> sprintf "FDIV (\"%s\", \"%s\")" (Id.to_string v1) (Id.to_string v2)
   | NEW v -> sprintf "NEW (%s)" (string_id v)
   | MEMGET (v1,v2) -> sprintf "MEMGET (\"%s\", %s)" (Id.to_string v1) (string_id v2)
   | MEMASSIGN (v1,v2,v3) -> sprintf "(MEMASSIGN (\"%s\", %s, \"%s\"))" v1 (string_id v2) v3
@@ -400,9 +400,9 @@ let rec string_exp (e:expr) =
   let rec string_letdef (l:letdef) : string =
     match l with
     | Main asmt -> sprintf "\nMain (%s)" (string_asmt asmt)
-    | LetFloat(l, f) -> sprintf "\nLetFloat (%f)" f
+    | LetFloat(l, f) -> sprintf "\nLetFloat (\"%s\", %f)" l f
     | LetLabel (l, args, asmt) -> 
-      sprintf "\nLetLabel(\"%s\", [%s], %s)"
+      sprintf "\nLetLabel (\"%s\", [%s], %s)"
       (Id.to_string l)
       (Syntax.infix_to_string (fun x -> sprintf "\"%s\"" (Id.to_string x)) args ";")
       (string_asmt asmt)

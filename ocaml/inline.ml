@@ -8,25 +8,25 @@ type definition_map = Knorm.fundef list
 
 (* seuil de la taille d'une petite fonction *)
 (* une dizaine d'opérations A LA LOUCHE *)
-let max_deep = ref 10
+let max_depth = ref 10
 
 (* Calcule la taille de la fonction en nombre de noeuds dans l'ast *)
-let rec deep (e:Knorm.knorm_t) (env:Id.t list) : int =
+let rec depth (e:Knorm.knorm_t) (env:Id.t list) : int =
   match e with
   | App (f, _) -> 
     (* si f recursive pas de remplacement : on depasse le seuil *)
-    (try let _ = List.find (fun x -> x = f) env in !max_deep + 2 
+    (try let _ = List.find (fun x -> x = f) env in !max_depth + 2 
      with Not_found -> 1)
 
   | IfEq ((x, y), k1, k2) -> 
-    let d1 = deep k1 env and d2 = deep k2 env in  1 + d1 + d2
+    let d1 = depth k1 env and d2 = depth k2 env in  1 + d1 + d2
   | IfLE ((x, y), k1, k2) ->
-    let d1 = deep k1 env and d2 = deep k2 env in 1 + d1 + d2
+    let d1 = depth k1 env and d2 = depth k2 env in 1 + d1 + d2
   | Let ((id,t), k1, k2) ->
-    let d1 = deep k1 env and d2 = deep k2 env in  1 + d1 + d2
+    let d1 = depth k1 env and d2 = depth k2 env in  1 + d1 + d2
   | LetRec (fd, e) -> 
-    let d1 = deep fd.body ((fst fd.name)::env) and d2 = deep e env in 1 + d1 + d2
-  | LetTuple (args, var, e) -> 1 + (deep e env)
+    let d1 = depth fd.body ((fst fd.name)::env) and d2 = depth e env in 1 + d1 + d2
+  | LetTuple (args, var, e) -> 1 + (depth e env)
   | _ -> 1
 
 
@@ -81,8 +81,8 @@ let expansion (ast:Knorm.knorm_t) : Knorm.knorm_t =
 
     | LetRec (fd, e) -> 
       let in_body = inline fd.body env in
-        let fdeep = deep in_body [(fst fd.name)] in
-          if fdeep <= !max_deep then 
+        let fdepth = depth in_body [(fst fd.name)] in
+          if fdepth <= !max_depth then 
             LetRec({name = fd.name; args = fd.args; body = in_body}, inline e (fd::env))
           else LetRec({name = fd.name; args = fd.args; body = in_body}, inline e env)
     | App (f, vars) -> 

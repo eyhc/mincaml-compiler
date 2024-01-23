@@ -1,39 +1,64 @@
 open RegAlloc
 
-let header : string list ref = ref [".text"; ".global main"; ""]
-let consts : string list ref = ref []
+(* Blocks which will contain the generate ARM assembly code *)
+let header : string list ref = ref [".text"; ".global main"]
+let consts : string list ref = ref [""]
 let floats : string list ref = ref []
 
+(* Label counters *)
 let if_label_counter = ref 0
 let num_label_counter = ref 0
 
+(* A stack which will keep track of the current sp value in case we need to update the SP *)
 let sp_values : int list ref = ref []
 
+(* A Boolean which will be 1 if we have parameters pushed on the stack, else 0 *)
 let pushed_vars : int ref = ref 0
 
+(* Generates a label for an if block *)
 let generate_if_label () =
   let label = "l" ^ string_of_int !if_label_counter in
   if_label_counter := !if_label_counter + 1;
   label
 
+(* Generate a label for large constants *)
 let generate_num_label () =
   let label = "const_" ^ string_of_int !num_label_counter in
   num_label_counter := !num_label_counter + 1;
   label
-   
+
+(* Function which will convert the ASML to ARM assembly *)
 let rec generate_asm_regt : regt -> string list = function
 | Let (s, expr) ->
   (match expr with
     | Int n ->
-      if n <= 255 then
-        [Printf.sprintf "\tmov %s, #%d" s n]
+      if s.[0] = 'r' then
+        begin
+        if n <= 255 then
+          [Printf.sprintf "\tmov %s, #%d" s n]
+        else
+          [Printf.sprintf "\tldr %s, =#%d" s n]
+        end
       else
-        [Printf.sprintf "\tldr %s, =#%d" s n]
+        begin
+        if n <= 255 then
+          [Printf.sprintf "\tvmov.f32 %s, #%d" s n]
+        else
+          [Printf.sprintf "\tvldr.f32 %s, =#%d" s n]
+        end
     | Reg reg ->
       if s = reg then
         []
       else
-        [Printf.sprintf "\tmov %s, %s" s reg]
+        if s.[0] = 'r' && reg.[0] = 'r' then
+          [Printf.sprintf "\tmov %s, %s" s reg]
+        else
+          begin
+          if s <> "r0" then
+            [Printf.sprintf "\tvmov.f32 %s, %s" s reg]
+          else
+            [Printf.sprintf "\tvmov.f32 s0, %s" reg]
+          end
     | Add (s1, expr) ->
       (match expr with
       | Int n -> 
@@ -80,6 +105,13 @@ let rec generate_asm_regt : regt -> string list = function
         else
           Printf.sprintf "\tldr r12, =%d\n\tcmp %s, r12" n r1
       in
+
+      let mov_instruction =
+        match s.[0] with
+        | 'r' -> Printf.sprintf "\tmov %s, r0" s
+        | _   -> Printf.sprintf "\tvmov.f32 %s, s0" s
+      in
+
       cmp_instruction ::
       Printf.sprintf "\tb%s %s" cmp_type true_label ::
       List.concat (List.map generate_asm_regt false_branch) @
@@ -87,7 +119,7 @@ let rec generate_asm_regt : regt -> string list = function
       Printf.sprintf "\t%s:" true_label ::
       List.concat (List.map generate_asm_regt true_branch) @
       Printf.sprintf "\t%s:" end_label ::
-      Printf.sprintf "\tmov %s, r0" s :: []
+      mov_instruction :: []
     | Call (func_name, nb_params) ->
 
       let first_element = match !sp_values with
@@ -119,12 +151,18 @@ let rec generate_asm_regt : regt -> string list = function
           end
         else
           [] 
-      in     
+      in 
+      
+      let mov_instruction =
+        match s.[0] with
+        | 'r' -> Printf.sprintf "\tmov %s, r0" s
+        | _   -> Printf.sprintf "\tvmov.f32 %s, s0" s
+      in
         
       [ Printf.sprintf "\tpush {r4-r10}";
         Printf.sprintf "\tbl %s" func_name;
         Printf.sprintf "\tpop {r4-r10}";
-        Printf.sprintf "\tmov %s, r0" s]
+        mov_instruction ]
         @ instructions @ !temp_loads;
 
     | CallClo (reg, nb_params) ->
@@ -159,22 +197,55 @@ let rec generate_asm_regt : regt -> string list = function
           end
         else
           [] 
-      in  
+      in
+
+      let mov_instruction =
+        match s.[0] with
+        | 'r' -> Printf.sprintf "\tmov %s, r0" s
+        | _   -> Printf.sprintf "\tvmov.f32 %s, s0" s
+      in
   
       [ Printf.sprintf "\tpush {r4-r10}";
         Printf.sprintf "\tblx r12";
         Printf.sprintf "\tpop {r4-r10}";
-        Printf.sprintf "\tmov %s, r0" s]
+        mov_instruction]
         @ instructions @ !temp_loads;
     | Adresse a -> 
       if abs(int_of_string a) <= 255 then
         [Printf.sprintf "\tadd %s, fp, #%s" s a]
       else
         [Printf.sprintf "\tldr r12, =#%s" a; Printf.sprintf "\tadd %s, fp, r12" s]
-    | MemGet (s1, adr) -> [Printf.sprintf "\tldr %s, [%s, #%s]" s s1 adr]
-    | Label l -> [Printf.sprintf "\tldr %s, =%s" s l]
+    | MemGet (s1, adr, nb_params) -> 
+      if s1 = "%self" then
+        begin
+          let offset = ref 36 in
+          if nb_params > 4 then
+            offset := !offset + ((nb_params - 4) * 4);
+    
+          [Printf.sprintf "\tldr r12, [fp, #%d]" !offset;
+            Printf.sprintf "\tldr %s, [r12, #%s]" s adr]
+        end
+      else
+        if s.[0] = 'r' then
+          [Printf.sprintf "\tldr %s, [%s, #%s]" s s1 adr]
+        else
+          begin
+            if s1.[0] = 'r' then
+              [Printf.sprintf "\tvldr.f32 %s, [%s, #%s]" s s1 adr]
+            else
+              [Printf.sprintf "\tvldr.f32 %s, [r12, #%s]" s adr]
+          end
+    | Label l -> 
+      if s.[0] = 'r' then
+        [Printf.sprintf "\tldr %s, =%s" s l]
+      else
+        [Printf.sprintf "\tldr r12, =%s" l]
     | Neg s1 -> [Printf.sprintf "\tneg %s, %s" s s1]
-    | Unit -> [Printf.sprintf "\tmov %s, #0" s]
+    | Unit -> 
+      if s.[0] = 'r' then
+        [Printf.sprintf "\tmov %s, #0" s]
+      else
+        [Printf.sprintf "\tvmov.f32 %s, #0" s]
     | _ -> assert false)
 | Exp exp ->
 (match exp with
@@ -209,12 +280,17 @@ let rec generate_asm_regt : regt -> string list = function
     if n <= 255 then
       [Printf.sprintf "\tmov r0, #%d" n]
     else
-      [Printf.sprintf "\tldr r0, =#%d" n]      
+      [Printf.sprintf "\tldr r0, =#%d" n] 
   | Reg reg ->
-    if reg = "r0" then
-      []
-    else
-      [Printf.sprintf "\tmov r0, %s" reg]
+      if reg.[0] = 'r' then
+        begin
+          if reg = "r0" then
+            []
+          else
+            [Printf.sprintf "\tmov r0, %s" reg]
+        end
+      else
+        [Printf.sprintf "\tvmov.f32 s0, %s" reg]     
   | Add (s1, expr) ->
     (match expr with
     | Int n -> 
@@ -315,17 +391,25 @@ let rec generate_asm_regt : regt -> string list = function
   | Neg s1 -> [Printf.sprintf "\tneg r0, %s" s1]
   | Unit -> []
   | _ -> assert false)
-| Store (Reg reg, mem) -> [Printf.sprintf "\tstr %s, [fp, #%s]" reg mem]
-| Load (s, Reg reg) -> [Printf.sprintf "\tldr %s, [fp, #%s]" reg s]
+| Store (Reg reg, mem) -> 
+  if reg.[0] = 'r' then
+    [Printf.sprintf "\tstr %s, [fp, #%s]" reg mem]
+  else
+    [Printf.sprintf "\tvstr.f32 %s, [fp, #%s]" reg mem]
+| Load (s, Reg reg) ->
+  if reg.[0] = 'r' then  
+    [Printf.sprintf "\tldr %s, [fp, #%s]" reg s]
+  else 
+    [Printf.sprintf "\tvldr.f32 %s, [fp, #%s]" reg s]
 | LoadReg (s, Reg reg) -> [Printf.sprintf "\tldr %s, [%s]" s reg]
 | Push (r) -> 
   pushed_vars := 1;
   [Printf.sprintf "\tpush {%s}" r]
-| LetFloat (s, f) -> 
-  floats := !floats @ [s ^ ": .float " ^ f];
-  []
+
 | _ -> assert false
 
+(* Function which will calculate the prologue SP value of a function,
+  and start the code generation of the function's body *)
 and generate_asm_fun_internal : reg_function -> string list = fun { name; body } ->
   let rec extract_negative_sizes_regt : regt -> int list = function
   | Let (_, If (_, _, rts1, rts2)) | Exp (If (_, _, rts1, rts2)) ->
@@ -358,11 +442,12 @@ and generate_asm_fun_internal : reg_function -> string list = fun { name; body }
 
   sp_values := size :: !sp_values;
 
-  [Printf.sprintf "%s:" name]
+  [Printf.sprintf "\n%s:" name]
   @ generate_prologue size
   @ List.concat (List.map generate_asm_regt body)
   @ generate_epilogue
 
+(* Generates the prologue *)
 and generate_prologue size =
   if size <= 255 then
     ["\tpush {fp, lr}"; "\tadd fp, sp, #0"; "\tsub sp, sp, #" ^ string_of_int size]
@@ -372,6 +457,7 @@ and generate_prologue size =
     ["\tpush {fp, lr}"; "\tadd fp, sp, #0"; "\tldr sp, " ^ label;
                 "\tsub sp, fp, sp"]
   
+(* Generates the epilogue *)
 and generate_epilogue =
   match !sp_values with
   | _ :: rest ->
@@ -395,6 +481,9 @@ let generate_asm_reg (defs: letregdef list) : string list =
         | Fun f ->
           let asm_hd = generate_asm_fun_internal f in
           generate_asm_internal (acc @ asm_hd) tl
+        | LetFloatReg (s, f) -> 
+          floats := !floats @ [s ^ ": .float " ^ f];
+          generate_asm_internal (acc) tl
     in
     let asm_code = generate_asm_internal [] defs in !header @ !consts @ !floats @ asm_code
   

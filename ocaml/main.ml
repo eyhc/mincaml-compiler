@@ -15,7 +15,6 @@ let type_only = ref false and asml_only = ref false and parse_only = ref false
 let test = ref false 
 let knorm_only = ref false and alpha = ref false 
 and let_reduc = ref false and closure = ref false and optim = ref false
-and back_print = ref false
 
 
 (* -n_iter *)
@@ -38,14 +37,13 @@ let speclist = [
   ("-asml", Arg.Unit (fun () -> asml_only := true), "Print asml");
   ("-p", Arg.Unit (fun () -> parse_only := true), "Parse only");
   ("-n_iter", Arg.Set_int(n_iter_optim), "<integer> Set the number of optimisation iterations");
-  ("-inline_deep", Arg.Set_int(Inline.max_deep), "<i> Set the max_deep of inline expansion");
+  ("-inline_depth", Arg.Set_int(Inline.max_depth), "<i> Set the max_deep of inline expansion");
   ("-show_type", Arg.Unit (fun () -> show_type := true), "show type informations");
   ("-test-knorm", Arg.Unit(fun () -> test := true; knorm_only :=true), "Knormalization only");
   ("-test-alpha", Arg.Unit(fun () -> test := true; alpha :=true), "Alpha-reduction");
   ("-test-let", Arg.Unit(fun () -> test := true; let_reduc :=true), "Reduction of nested let-expression");
   ("-test-closure", Arg.Unit(fun () -> test := true; closure :=true), "Closure conversion");
-  ("-test-optim", Arg.Unit(fun () -> test := true; optim :=true), "test optimisation");
-  ("-test-back", Arg.Unit(fun () -> test := true; back_print :=true), "Back code intermediaire")
+  ("-test-optim", Arg.Unit(fun () -> test := true; optim :=true), "test optimisation")
 ]
 
 (* SHOW HELP IN TERM (-h option) *)
@@ -99,18 +97,18 @@ let print_knorm ast =
   Typechecker.type_check ast;
   let res = Knorm.normalize ast in
     if !show_type then
-      print_endline (Knorm.to_string res)
-    else
       print_endline (Knorm.to_string_with_type res)
+    else
+      print_endline (Knorm.to_string res)
 
 let print_alpha ast =
   Typechecker.type_check ast;
   let res = Knorm.normalize ast in
   let res = Alpha.conversion res in
     if !show_type then
-      print_endline (Knorm.to_string res)
-    else
       print_endline (Knorm.to_string_with_type res)
+    else
+      print_endline (Knorm.to_string res)
 
 let print_let_reduc ast =
   Typechecker.type_check ast;
@@ -118,9 +116,9 @@ let print_let_reduc ast =
   let res = Alpha.conversion res in
   let res = Reduction.reduction res in
     if !show_type then
-      print_endline (Knorm.to_string res)
-    else
       print_endline (Knorm.to_string_with_type res)
+    else
+      print_endline (Knorm.to_string res)
 
 let print_optim ast =
   Typechecker.type_check ast;
@@ -132,9 +130,9 @@ let print_optim ast =
   let res = Constant.folding res in
   let res = Elim.elim_definition res in
     if !show_type then
-      print_endline (Knorm.to_string res)
-    else
       print_endline (Knorm.to_string_with_type res)
+    else
+      print_endline (Knorm.to_string res)
 
 let print_closure ast =
   Typechecker.type_check ast;
@@ -143,17 +141,6 @@ let print_closure ast =
   let res = Reduction.reduction res in
   let res = Closure.closure res in
     print_endline (Closure.to_string res)
-
-let print_back ast =
-  Typechecker.type_check ast;
-  let ast = Knorm.normalize ast in
-  let ast = Alpha.conversion ast in
-  let ast = Reduction.reduction ast in
-  let ast = Closure.closure ast in
-  let asml = Asml.generation ast in
-  let asml = ImmOptim.optim asml in
-  let b = RegAlloc.parcours asml in 
-  RegAlloc.print_reg_function b
 
 let print_test f =
   let ast = get_ast f in
@@ -167,11 +154,6 @@ let print_test f =
       print_let_reduc ast
     else if !closure then
       print_closure ast
-    else if !back_print then
-      print_back ast
-    else
-      print_endline "The function you want to test is missing ! Put the corresponding argument : -knorm; -alpha; -let; -closure"
-
 
 (********************************************************)
 (********************************************************)
