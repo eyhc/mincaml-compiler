@@ -37,7 +37,7 @@ let speclist = [
   ("-asml", Arg.Unit (fun () -> asml_only := true), "Print asml");
   ("-p", Arg.Unit (fun () -> parse_only := true), "Parse only");
   ("-n_iter", Arg.Set_int(n_iter_optim), "<integer> Set the number of optimisation iterations");
-  ("-inline_deep", Arg.Set_int(Inline.max_deep), "<i> Set the max_deep of inline expansion");
+  ("-inline_depth", Arg.Set_int(Inline.max_depth), "<i> Set the max_deep of inline expansion");
   ("-show_type", Arg.Unit (fun () -> show_type := true), "show type informations");
   ("-test-knorm", Arg.Unit(fun () -> test := true; knorm_only :=true), "Knormalization only");
   ("-test-alpha", Arg.Unit(fun () -> test := true; alpha :=true), "Alpha-reduction");
