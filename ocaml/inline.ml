@@ -11,22 +11,21 @@ type definition_map = Knorm.fundef list
 let max_depth = ref 10
 
 (* Calcule la taille de la fonction en nombre de noeuds dans l'ast *)
-let rec depth (e:Knorm.knorm_t) (env:Id.t list) : int =
+let rec depth (e:Knorm.knorm_t) (fct_name:Id.t) : int =
   match e with
   | App (f, _) -> 
     (* si f recursive pas de remplacement : on depasse le seuil *)
-    (try let _ = List.find (fun x -> x = f) env in !max_depth + 2 
-     with Not_found -> 1)
+    (if f = fct_name then !max_depth + 2 else 1)
 
   | IfEq ((x, y), k1, k2) -> 
-    let d1 = depth k1 env and d2 = depth k2 env in  1 + d1 + d2
+    let d1 = depth k1 fct_name and d2 = depth k2 fct_name in  1 + d1 + d2
   | IfLE ((x, y), k1, k2) ->
-    let d1 = depth k1 env and d2 = depth k2 env in 1 + d1 + d2
+    let d1 = depth k1 fct_name and d2 = depth k2 fct_name in 1 + d1 + d2
   | Let ((id,t), k1, k2) ->
-    let d1 = depth k1 env and d2 = depth k2 env in  1 + d1 + d2
+    let d1 = depth k1 fct_name and d2 = depth k2 fct_name in  1 + d1 + d2
   | LetRec (fd, e) -> 
-    let d1 = depth fd.body ((fst fd.name)::env) and d2 = depth e env in 1 + d1 + d2
-  | LetTuple (args, var, e) -> 1 + (depth e env)
+    let d1 = depth fd.body fct_name and d2 = depth e fct_name in 1 + d1 + d2
+  | LetTuple (args, var, e) -> 1 + (depth e fct_name)
   | _ -> 1
 
 
@@ -81,7 +80,7 @@ let expansion (ast:Knorm.knorm_t) : Knorm.knorm_t =
 
     | LetRec (fd, e) -> 
       let in_body = inline fd.body env in
-        let fdepth = depth in_body [(fst fd.name)] in
+        let fdepth = depth in_body (fst fd.name) in
           if fdepth <= !max_depth then 
             LetRec({name = fd.name; args = fd.args; body = in_body}, inline e (fd::env))
           else LetRec({name = fd.name; args = fd.args; body = in_body}, inline e env)
