@@ -91,6 +91,9 @@ let floatsdef: letdef list ref = ref []
 (* La définition des fonctions du programme mais non converties en ASML  *)
 let funsdef: Closure.fundef list ref = ref []
 
+(* L'ensemble des variables qui sont utilisées dans un Get *)
+let get_vars: VarSet.t ref = ref VarSet.empty
+
 let get_fdef (name: Id.t): Closure.fundef =
   List.find (fun (x: Closure.fundef) -> fst x.label = name) !funsdef
 
@@ -236,6 +239,9 @@ and generation_asmt (env: VarSet.t) (a:Closure.t) : asmt =
   | Let ((x, t), e1, e2) -> 
       let env' = VarSet.add (x, t) env in
       (match e1 with
+      | Int(i) -> 
+          let value = if List.exists (fun (y, z) -> y = x) (VarSet.elements !get_vars) then VAL(Const(i * 4)) else VAL(Const(i)) in
+          LET(x, value, generation_asmt env' e2)
       | Tuple(vars) -> generation_tuple x vars (generation_asmt env' e2)
       | Array(size, default) -> 
           let at = snd (List.find (fun (y, z) -> y = default) (VarSet.elements env)) in
@@ -278,6 +284,16 @@ let rec generation_letdef (a:Closure.fundef) : letdef =
   )
 
 (* 
+  Trouve l'ensemble des variables qui sont utilisées dans un Get comme indice
+*)
+let rec find_get_vars (env: VarSet.t) (exp: Closure.t): VarSet.t =
+  match exp with
+  | IfEq(a, b, th, els) | IfLE(a, b, th, els) -> VarSet.union (find_get_vars env th) (find_get_vars env els)
+  | Let((id, t), value, next) -> let env' = VarSet.add (id, t) env in VarSet.union (find_get_vars env' value) (find_get_vars env' next)
+  | Get(a, b) -> let t = List.find (fun (x, y) -> x = b) (VarSet.elements env) in VarSet.singleton t
+  | _ -> VarSet.empty
+
+(* 
   Génère le code asml équivalent au programme en paramètre
   Paramètres:
   - ast -> l'ast du programme
@@ -288,7 +304,8 @@ let rec generation (ast:Closure.t) : asml =
   | Prog (fcts, main) -> 
     floatsdef := [];
     funsdef := fcts;
-    let funs = List.map generation_letdef fcts in
+    let funs = List.map (fun (x: Closure.fundef) -> get_vars := find_get_vars VarSet.empty x.code; generation_letdef x) fcts in
+    get_vars := find_get_vars VarSet.empty main;
     let main = Main(generation_asmt VarSet.empty main) in
     !floatsdef @ funs @ [main]
   | _ -> failwith "Not correct closure form" 
