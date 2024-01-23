@@ -129,54 +129,6 @@ let make_closure (id: Id.t) (f: Id.t) (frees: Id.t list) (next: asmt): asmt =
   pointer
 
 (* 
-  Convertit le code d'un appel de fonction, en ajoutant si nécessaire des closures si un ou plusieurs des paramètres
-  sont des fonctions
-  Paramètres:
-  - id -> le nom de la variable qui contiendra l'appel à la fonction
-  - f -> le label de la fonction appelée
-  - args -> les arguments de la fonction appelée
-  - next -> le code près cet appel de fonction
-  Retourne: le code ASML de l'appel de la fonction, les closures nécessaire sont placées avant dans le code   
-*)
-let rec generation_call (id: Id.t) (f: Id.t) (args: Id.t list) (next: asmt): asmt =
-  (* Ensemble des paramètres qui sont des fonctions *)
-  let f_args = List.filter (fun x -> is_fun x || Typechecker.is_prefef_fun x) args in
-  if List.length f_args > 0 then
-    (* Au moins un des paramètres est une fonction *)
-    (* Pour chaque argument qui est une fonction, on génère une variable qui va contenir la closure pour cette fonction *)
-    let args_ids = (List.map (fun x -> (x, Id.genid ())) f_args) in
-    (* Ajoute les closures nécessaire pour les paramètres qui sont des fonctions *)
-    let rec generate_funs_closure (args: (Id.t * Id.t) list) (next: asmt): asmt =
-      match args with
-      | [(x, y)] -> 
-          if Typechecker.is_prefef_fun x then
-            make_closure y (convert_predef_name x) [] next
-          else
-            let f = get_fdef x in 
-            make_closure y (fst f.label) (List.map fst f.frees) next
-      | (x, y) :: tail -> 
-          if Typechecker.is_prefef_fun x then
-            make_closure y (convert_predef_name x) [] (generate_funs_closure tail next)
-          else
-            let f = get_fdef x in make_closure y (fst f.label) (List.map fst f.frees) (generate_funs_closure tail next)
-      | _ -> assert false
-    in
-    (* Remplace les arguments qui sont des fonctions par les variables qui contiennent le pointeur de leur closure *)
-    let rename_arg (arg: Id.t): Id.t =
-      if List.exists (fun y -> (fst y) = arg) args_ids then
-        snd (List.find (fun y -> (fst y) = arg) args_ids)
-      else 
-        arg
-    in
-    (* Le call avec les arguments mis à jour *)
-    let call = CALL(f, List.map rename_arg args) in
-    let call = LET(id, call, next) in
-    generate_funs_closure args_ids call
-  else
-    (* Aucun des arguments n'est une fonction *)
-    LET(id, (if Typechecker.is_prefef_fun f then call_predef f args else CALL(f, args)), next)
-
-(* 
   Génère le code ASML pour la déclaration d'un tuple
   Paramètres:
   - id -> le nom de la variable qui contiendra le pointeur sur le tuple
@@ -184,7 +136,7 @@ let rec generation_call (id: Id.t) (f: Id.t) (args: Id.t list) (next: asmt): asm
   - e1 -> le code après la déclaration du tuple
   Retourne: le code ASML de la déclaration du tuple
 *)
-and generation_tuple (id: Id.t) (vars: Id.t list) (e1: asmt): asmt =
+let rec generation_tuple (id: Id.t) (vars: Id.t list) (e1: asmt): asmt =
   let size = List.length vars in
   (* Ajoute les mem assign nécessaire pour les éléments du tuple *)
   let rec gen (p: Id.t) (n: int) (vs: Id.t list) (next: asmt): asmt =
@@ -284,7 +236,6 @@ and generation_asmt (env: VarSet.t) (a:Closure.t) : asmt =
   | Let ((x, t), e1, e2) -> 
       let env' = VarSet.add (x, t) env in
       (match e1 with
-      | ApplyDir(f, args) -> generation_call x f args (generation_asmt env' e2)
       | Tuple(vars) -> generation_tuple x vars (generation_asmt env' e2)
       | Array(size, default) -> 
           let at = snd (List.find (fun (y, z) -> y = default) (VarSet.elements env)) in
@@ -306,14 +257,6 @@ and generation_asmt (env: VarSet.t) (a:Closure.t) : asmt =
   | Float f -> 
       let id = Id.make_unique "x" in
       generation_float id f (EXP (VAL (Var id)))
-  (* Lorsqu'une fonction retourne le contenu d'une variable *)
-  | Var id when Typechecker.is_prefef_fun id -> 
-      let var_id = Id.genid () in
-      make_closure var_id (convert_predef_name id) [] (EXP(VAL(Var(var_id))))
-  (* Lorsqu'une fonction retourne la valeur de retour d'une autre fonction *)
-  | ApplyDir(f, vars) -> 
-      let var_id = Id.genid () in
-      generation_call var_id f vars (EXP(VAL(Var(var_id))))
   | _ -> EXP (generation_expr env a)
 
 (* 
