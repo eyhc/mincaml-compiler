@@ -66,7 +66,7 @@ let elim_definition (ast:Knorm.knorm_t) : Knorm.knorm_t =
       let _ = env_incr env f in 
         let _ = List.iter (env_incr env) vars in a
 
-    | Get (x, y) -> 
+    | Get (x, y) | Array(x,y) -> 
       let _ = env_incr env x in 
         let _ = env_incr env y in a
     | Put (x, y, z) -> 
@@ -76,9 +76,6 @@ let elim_definition (ast:Knorm.knorm_t) : Knorm.knorm_t =
     
     | Tuple(l) -> 
       let _ = List.iter (env_incr env) l in a
-    | Array(x,y) -> 
-      let _ = env_incr env x in 
-        let _ = env_incr env y in a
 
     
     (* with recursive calls *)

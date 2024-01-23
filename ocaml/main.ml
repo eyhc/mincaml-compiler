@@ -18,7 +18,7 @@ and let_reduc = ref false and closure = ref false and optim = ref false
 
 
 (* -n_iter *)
-let n_iter_optim = ref 500
+let n_iter_optim = ref 50
 
 (* -show_type *)
 let show_type = ref false

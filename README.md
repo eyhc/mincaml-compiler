@@ -41,10 +41,10 @@ ocaml/mincamlc test.mml -o test.s
 
 ### Configuration des Optimisations
 
-Pour fixer le nombre de fois où on applique les optimisations (défaut 500).
-Par exemple :
+Pour fixer le nombre de fois où on applique les optimisations (défaut 50).
+Par exemple pour les désactiver :
 ```sh
-ocaml/mincamlc test.mml -o test.s -n_iter 1000
+ocaml/mincamlc test.mml -o test.s -n_iter 0
 ```
 
 Pour fixer la taille maximale des fonctions dont le code est substitué par l'inline expansion (défaut 10).
