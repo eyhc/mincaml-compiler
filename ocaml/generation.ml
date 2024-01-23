@@ -68,7 +68,11 @@ let rec generate_asm_regt : regt -> string list = function
           [Printf.sprintf "\tadd %s, %s, #%d" s s1 n]
         else
           [Printf.sprintf "\tldr r12, =#%d" n; Printf.sprintf "\tadd %s, %s, r12" s s1]
-      | Reg reg -> [Printf.sprintf "\tadd %s, %s, %s" s s1 reg]
+      | Reg reg -> 
+        if s = s1 && s = reg then
+          [Printf.sprintf "\tlsl %s, %s, #1" s s]
+        else
+          [Printf.sprintf "\tadd %s, %s, %s" s s1 reg]
       | _ -> assert false)
     | Fadd (s1, label) -> [Printf.sprintf "\tvadd.f32 %s, %s, %s" s s1 label]
     | Sub (s1, expr) ->
@@ -80,7 +84,11 @@ let rec generate_asm_regt : regt -> string list = function
           [Printf.sprintf "\tsub %s, %s, #%d" s s1 n]
         else
           [Printf.sprintf "\tldr r12, =#%d" n; Printf.sprintf "\tsub %s, %s, r12" s s1]
-      | Reg reg -> [Printf.sprintf "\tsub %s, %s, %s" s s1 reg]
+      | Reg reg -> 
+        if s = s1 && s = reg then
+          [Printf.sprintf "\tlsr %s, %s, #1" s s]
+        else
+          [Printf.sprintf "\tsub %s, %s, %s" s s1 reg]
       | _ -> assert false)
     | Fsub (s1, label) -> [Printf.sprintf "\tvsub.f32 %s, %s, %s" s s1 label]
     | Fdiv (s1, label) -> [Printf.sprintf "\tvdiv.f32 %s, %s, %s" s s1 label]
@@ -241,6 +249,10 @@ let rec generate_asm_regt : regt -> string list = function
       else
         [Printf.sprintf "\tldr r12, =%s" l]
     | Neg s1 -> [Printf.sprintf "\tneg %s, %s" s s1]
+    | MemGetTab (adrReg, idxReg) ->
+      [Printf.sprintf "\tmov r12, %s" idxReg;
+       Printf.sprintf "\tlsl r12, r12, #2";
+       Printf.sprintf "\tldr %s, [%s, r12]" s adrReg]
     | Unit -> 
       if s.[0] = 'r' then
         [Printf.sprintf "\tmov %s, #0" s]
@@ -298,7 +310,11 @@ let rec generate_asm_regt : regt -> string list = function
         [Printf.sprintf "\tadd r0, %s, #%d" s1 n]
       else
         [Printf.sprintf "\tldr r0, =#%d" n; Printf.sprintf "\tadd r0, %s, r0" s1]
-    | Reg reg -> [Printf.sprintf "\tadd r0, %s, %s" s1 reg]
+    | Reg reg -> 
+      if s1 = reg && s1 = "r0" then
+        [Printf.sprintf "\tlsl %s, %s, #1" s1 reg]
+      else
+        [Printf.sprintf "\tadd r0, %s, %s" s1 reg]
     | _ -> assert false)
   | Fadd (s1, label) -> [Printf.sprintf "\tvadd.f32 r0, %s, %s" s1 label]
   | Sub (s1, expr) ->
@@ -308,7 +324,11 @@ let rec generate_asm_regt : regt -> string list = function
         [Printf.sprintf "\tsub r0, %s, #%d" s1 n]
       else
         [Printf.sprintf "\tldr r0, =#%d" n; Printf.sprintf "\tsub r0, %s, r0" s1]
-    | Reg reg -> [Printf.sprintf "\tsub r0, %s, %s" s1 reg]
+    | Reg reg -> 
+      if s1 = reg && s1 = "r0" then
+        [Printf.sprintf "\tlsl %s, %s, #1" s1 reg]
+      else
+        [Printf.sprintf "\tsub r0, %s, %s" s1 reg]      
     | _ -> assert false)
   | Fsub (s1, label) -> [Printf.sprintf "\tvsub.f32 r0, %s, %s" s1 label]
   | Fdiv (s1, label) -> [Printf.sprintf "\tvdiv.f32 r0, %s, %s" s1 label]
@@ -401,6 +421,10 @@ let rec generate_asm_regt : regt -> string list = function
     [Printf.sprintf "\tldr %s, [fp, #%s]" reg s]
   else 
     [Printf.sprintf "\tvldr.f32 %s, [fp, #%s]" reg s]
+| MemAssign (adrReg, idx, valToAdd) -> 
+  [Printf.sprintf "\tmov r12, %s" idx;
+   Printf.sprintf "\tlsl r12, r12, #2";
+   Printf.sprintf "\tstr %s, [%s, r12]" valToAdd adrReg]
 | LoadReg (s, Reg reg) -> [Printf.sprintf "\tldr %s, [%s]" s reg]
 | Push (r) -> 
   pushed_vars := 1;

@@ -197,7 +197,6 @@ let main (inp:string) (out:string) : unit =
     let ast = Reduction.reduction ast in 
     let ast = Closure.closure ast in      (* Closure conversion *)
     let asml = Asml.generation ast in     (* ASML generation *)
-    let asml = ImmOptim.optim asml in     (* Immediate optimization *)
     let b = RegAlloc.parcours asml in          (* Register allocation *)                     
     let arm = Generation.generate_asm_reg b in (* ARM generation *)
     set_arm_file arm out                       (* Saving result in file *)

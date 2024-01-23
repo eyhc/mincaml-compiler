@@ -18,6 +18,7 @@ type reg_expr =
   | If of Id.l * (Id.t*reg_expr) * regt list * regt list
   | Reg of Id.t
   | MemGet of Id.t * Id.t * int
+  | MemGetTab of Id.t * Id.t
   | Adresse of Id.t
   | Label of Id.t
   | Unit
@@ -29,6 +30,7 @@ and regt=
   | Load of Id.t * reg_expr 
   | LoadReg of Id.t * reg_expr 
   | Push of Id.t
+  | MemAssign of Id.t * Id.t * Id.t
   
   and letregdef = 
     | Fun of reg_function
@@ -249,7 +251,9 @@ let get_intervals_i asml var_to_register list_param=
         i_intervals_string s;
         i_intervals_id_or_imm i_o_s;
         get_keys var_to_register
-    | MEMASSIGN (_, _,s2) ->
+    | MEMASSIGN (t, i_o_s,s2) ->
+        i_intervals_string t;
+        i_intervals_id_or_imm i_o_s;
         i_intervals_string s2;
     | MEMGET (s, i_o_s ) ->
         i_intervals_string s;
@@ -510,12 +514,22 @@ let parcours asml =
   let new_body = ref [] in
   let rec parcours_asmt asmt bd var_to_register var_in_stack list_params is_float =
     match asmt with
-    | LET (var1, (MEMASSIGN (tuple, _, var)), exp) ->
+    | LET (var1, (MEMASSIGN (tuple, Const n, var)), exp) ->
         let r = actualisation_registres asmt var_to_register list_params bd var_in_stack var1 0 in
         remove_hash_register var_to_register var1 r;
         let adr = add_in_stack var_in_stack list_params var in
         let r_var = Hashtbl.find var_to_register var in 
         bd := !bd @ [Store (Reg r_var, adr)];
+        remove_hash_register var_to_register var r_var;
+        parcours_asmt exp bd var_to_register var_in_stack list_params is_float;
+    | LET (var1, (MEMASSIGN (tab, Var idx, var)), exp) ->
+        let r = actualisation_registres asmt var_to_register list_params bd var_in_stack var1 0 in
+        remove_hash_register var_to_register var1 r;
+        let adr = add_in_stack var_in_stack list_params var in
+        let r_var = Hashtbl.find var_to_register var in 
+        let r_idx = Hashtbl.find var_to_register idx in 
+        let r_tab = Hashtbl.find var_to_register tab in
+        bd := !bd @ [MemAssign (r_tab,r_var, r_idx)];
         remove_hash_register var_to_register var r_var;
         parcours_asmt exp bd var_to_register var_in_stack list_params is_float;
     | LET (var1, MEMGET (var, Const n), exp) ->
@@ -538,6 +552,19 @@ let parcours asml =
            let offset = "-" ^ string_of_int (n)  in
            bd := !bd @ [Let (r, MemGet (!r_var, offset, List.length list_params))];
            parcours_asmt exp bd var_to_register var_in_stack list_params is_float); 
+    | LET (var1, MEMGET (var, Var idx), exp) -> 
+        let r = actualisation_registres asmt var_to_register list_params bd var_in_stack var1 0 in
+        let r_var = ref "" in
+        if var = "%self" then begin
+          r_var := "%self" ;
+          let r_self = Hashtbl.find var_to_register var in
+          remove_hash_register var_to_register var r_self;
+        end
+        else 
+          r_var := Hashtbl.find var_to_register var;
+        let r_idx = Hashtbl.find var_to_register idx in
+        bd := !bd @ [Let (r, MemGetTab (!r_var, r_idx))];
+        parcours_asmt exp bd var_to_register var_in_stack list_params is_float; 
     | LET (var1, LABEL s, exp) -> 
         (try 
            Hashtbl.find float s;
@@ -707,57 +734,4 @@ let parcours asml =
     | [] -> !new_body
   in
   parcours_asml_list asml;
-;;
-let rec print_reg_expr reg_expr =
-  match reg_expr with
-  | Int i -> Printf.printf "(Int : %d)" i
-  | Neg s -> Printf.printf "(Neg :%s)" s
-  | Add (s, expr) -> Printf.printf "(Add (%s," s ;
-      print_reg_expr expr;
-      Printf.printf "))";
-  | Sub (s, expr) -> Printf.printf "(Sub (%s," s ;
-      print_reg_expr expr;
-      Printf.printf "))";
-  | Call (name, params) ->
-      Printf.printf "Call(%s, %d)" name params
-  | If (s,(s1,ios),regt1,regt2) ->
-      Printf.printf "If%s (%s," s s1;
-      print_reg_expr ios;
-      Printf.printf ") then \n";
-      print_lists regt1;
-      Printf.printf "else \n";
-      print_lists regt2;
-  | Reg s -> Printf.printf  "Reg %s" s
-  | Unit -> Printf.printf  "Unit"
-
-and print_regt  regt =
-  match regt with
-  | Let (s, expr) -> Printf.printf "(Let (%s," s ;
-      print_reg_expr expr;
-      Printf.printf "))\n";
-  | Exp expr -> Printf.printf "(Exp (" ;
-      print_reg_expr expr;
-      Printf.printf "))\n";
-  | Store (expr, s) -> Printf.printf " (Store (" ;
-      print_reg_expr expr;
-      Printf.printf ", %s)) " s;
-  | Load (s, expr) -> Printf.printf " (Load (%s," s;
-      print_reg_expr expr;
-      Printf.printf ")) "
-  | Push (s) -> Printf.printf " (Push (%s))" s;
-
-and print_reg_function reg_function =
-  match reg_function with
-  | Fun f :: tl ->  Printf.printf "Function name: %s\n" f.name;
-      Printf.printf "Body:\n";
-      List.iter (fun regt -> print_regt regt) f.body;
-      print_reg_function tl
-  | [] -> ()
-
-and print_lists l =
-  match l with
-  | hd :: tl ->
-      print_regt hd;
-      print_lists tl
-  | [] -> ()
 ;;
