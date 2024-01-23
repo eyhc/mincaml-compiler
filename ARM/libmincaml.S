@@ -1,6 +1,6 @@
 .data
 format_int:    .asciz "%d"
-format_float:  .asciz "%d"
+format_float:  .asciz "%f"
 format_nwline: .asciz "\n"
 
 .text
@@ -60,22 +60,21 @@ wend:
     bx lr
 
 @ Floats .....
-@ .global _min_caml_create_float_array
-@ _min_caml_create_float_array:
-@     push {lr}
-@     bl _min_caml_create_array
-@     pop {lr}
+.global _min_caml_create_float_array
+_min_caml_create_float_array:
+    push {lr}
+    bl _min_caml_create_array
+    pop {lr}
 
-@ .global _min_caml_print_float
-@ _min_caml_print_float:
-@     push {r0, r1, r2, lr}
-@     bl __aeabi_f2d @ float to double for printf
-@     mov r2, r0
-@     mov r3, r1
-@     ldr r0, =format_float
-@     bl printf
-@     pop {r0, r1, r2, lr}
-@     bx lr
+.global _min_caml_print_float
+_min_caml_print_float:
+    push {lr}
+    vcvt.f64.f32 d0, s0
+    vmov r2, r3, d0
+    ldr r0, =format_float
+    bl printf
+    pop {lr}
+    bx lr
 
 .global _min_caml_cos
 _min_caml_cos:
@@ -101,17 +100,17 @@ _min_caml_abs_float:
     bl fabsf
     pop {lr}
 
-@ .global _min_caml_float_of_int
-@ _min_caml_float_of_int:
-@     push {lr}
-@     bl __aeabi_i2f
-@     pop {lr}
+.global _min_caml_float_of_int
+_min_caml_float_of_int:
+    push {lr}
+    bl __aeabi_i2f
+    pop {lr}
 
-@ .global _min_caml_int_of_float
-@ .global _min_caml_truncate
-@ _min_caml_int_of_float:
-@ _min_caml_truncate:
-@     push {lr}
-@     bl __aeabi_f2iz
-@     pop {lr}
+.global _min_caml_int_of_float
+.global _min_caml_truncate
+_min_caml_int_of_float:
+_min_caml_truncate:
+    push {lr}
+    bl __aeabi_f2iz
+    pop {lr}
 
