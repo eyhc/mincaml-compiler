@@ -10,6 +10,7 @@ tests="tests/gen-code/"
 tests_abs=$(pwd)/"${tests}"
 generate=".s"
 arm_generate=".arm"
+EXEC=qemu-arm
 # test topics
 topics=("" "arithmetic operations" "call to external functions"
     "if_then_else" "functions" "arrays and tuples" 

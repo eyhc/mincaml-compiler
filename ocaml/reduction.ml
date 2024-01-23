@@ -8,7 +8,6 @@ open Knorm
 
 (* reduction of nested let-expression *)
 (* this algorithm is the same one in the article  *)
-(* AST MUST BE IN K-NORMAL FORM ! *)
 let rec reduction (ast_norm:knorm_t) : knorm_t =
   match ast_norm with
   | IfEq (b, e2, e3) -> IfEq (b, reduction e2, reduction e3)
