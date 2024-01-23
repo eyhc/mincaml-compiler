@@ -432,11 +432,7 @@ let store_to_regs_params lst bd var_to_register var_in_stack  =
           (try
              let r = Hashtbl.find var_to_register hd in
              let new_r = "r" ^ string_of_int count in
-             if String.compare r new_r < 0 then
-               let adr = Hashtbl.find var_in_stack hd in
-               bd := !bd @ [Load (adr, Reg new_r)];
-             else if String.compare r new_r <> 0 then
-               bd := !bd @ [Let (new_r, Reg r)];
+              bd := !bd @ [Let (new_r, Reg r)];
              store tl (count + 1)
            with Not_found ->
              let adr = Hashtbl.find var_in_stack hd in

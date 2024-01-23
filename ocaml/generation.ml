@@ -421,7 +421,7 @@ let rec generate_asm_regt : regt -> string list = function
     [Printf.sprintf "\tldr %s, [fp, #%s]" reg s]
   else 
     [Printf.sprintf "\tvldr.f32 %s, [fp, #%s]" reg s]
-| MemAssign (adrReg, idx, valToAdd) -> 
+| MemAssign (adrReg, valToAdd, idx) -> 
   [Printf.sprintf "\tmov r12, %s" idx;
    Printf.sprintf "\tlsl r12, r12, #2";
    Printf.sprintf "\tstr %s, [%s, r12]" valToAdd adrReg]
