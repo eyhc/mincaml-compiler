@@ -580,7 +580,6 @@ let parcours asml =
          with e -> 
            let r = actualisation_registres asmt var_to_register list_params bd var_in_stack var1 0 in
            bd := !bd @ [Let (r, Label (s))];
-           remove_hash_register var_to_register var1 r;
            parcours_asmt exp bd var_to_register var_in_stack list_params is_float);
     | LET (var1, var2, exp) ->
         if is_float = 0 then begin
