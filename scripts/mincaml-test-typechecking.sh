@@ -4,12 +4,8 @@ cd "$(dirname "$0")"/.. || exit 1
 MINCAMLC=ocaml/mincamlc
 OPTION=-t
 tests="tests/typechecking/"
-valid_tests="tests/typechecking/valid/"
-# test topics
-# topics=("simples typechecking" "arithmetic operations" "call to external functions"
-#     "if_then_else" "functions" "arrays and tuples" 
-#     "closure" "floats" )
 old_topic_num=-1
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 RESET='\033[0m'
@@ -69,10 +65,13 @@ do
     fi
 done
 
+# show the results of the tests
 echo "---------- END TESTING ----------"
 echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they succeed to fail)"
 echo "Tests failed : $failed / $((passed + failed))"
 echo "-----------------------------------\n"
+
+# save the results into resultats_tests.txt
 echo "\n- Typechecker -" >> resultats_tests.txt
 echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they succeed to fail)" >> resultats_tests.txt
 echo "Tests failed : $failed / $((passed + failed))" >> resultats_tests.txt
