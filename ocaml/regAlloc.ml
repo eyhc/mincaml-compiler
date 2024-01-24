@@ -432,7 +432,7 @@ let store_to_regs_params lst bd var_to_register var_in_stack  =
           (try
              let r = Hashtbl.find var_to_register hd in
              let new_r = "r" ^ string_of_int count in
-              bd := !bd @ [Let (new_r, Reg r)];
+             bd := !bd @ [Let (new_r, Reg r)];
              store tl (count + 1)
            with Not_found ->
              let adr = Hashtbl.find var_in_stack hd in
@@ -495,9 +495,18 @@ let actualisation_registres asmt hash list_params bd var_in_stack var1 is_float=
   end;;
 
 (* Fonction qui supprime une variable de la hashmap des registres et rend son registre disponible *)
-let remove_hash_register hash var r =
-  Hashtbl.remove hash var;
-  reg_available := !reg_available @ [r];;
+let remove_hash_register hash var r = 
+  let rec find_in_list lst elem = 
+    match lst with
+    | hd :: tl -> if hd = elem then true else find_in_list tl elem
+    |  [] -> false
+  in
+  if not (find_in_list register_param r) then begin
+    Hashtbl.remove hash var;
+    reg_available := !reg_available @ [r]
+  end
+;;
+
 
 (* Fonction qui calcul une adresse et l'ajoute dans la pile *)
 let add_in_stack var_in_stack list_params var =

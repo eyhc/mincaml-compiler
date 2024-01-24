@@ -65,6 +65,7 @@ _min_caml_create_float_array:
     push {lr}
     bl _min_caml_create_array
     pop {lr}
+    bx lr
 
 .global _min_caml_print_float
 _min_caml_print_float:
@@ -81,30 +82,35 @@ _min_caml_cos:
     push {lr}
     bl cosf
     pop {lr}
+    bx lr
 
 .global _min_caml_sin
 _min_caml_sin:
     push {lr}
     bl sinf
     pop {lr}
+    bx lr
 
 .global _min_caml_sqrt
 _min_caml_sqrt:
     push {lr}
     bl sqrtf
     pop {lr}
+    bx lr
 
 .global _min_caml_abs_float
 _min_caml_abs_float:
     push {lr}
     bl fabsf
     pop {lr}
+    bx lr
 
 .global _min_caml_float_of_int
 _min_caml_float_of_int:
     push {lr}
     bl __aeabi_i2f
     pop {lr}
+    bx lr
 
 .global _min_caml_int_of_float
 .global _min_caml_truncate
@@ -113,4 +119,5 @@ _min_caml_truncate:
     push {lr}
     bl __aeabi_f2iz
     pop {lr}
+    bx lr
 

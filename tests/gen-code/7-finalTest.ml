@@ -53,7 +53,7 @@ let rec print_arr arr size =
       print_arr_rec (i+1)
   in print_arr_rec 0
 in
-let size = 7 in
+let size = 6 in
 let array = Array.create size 1 in
 let a = array.(0) <- 12 in
 let b = array.(1) <- 15 in
@@ -61,7 +61,6 @@ let c = array.(2) <- 4 in
 let d = array.(3) <- 12 in
 let e = array.(4) <- 28 in
 let f = array.(5) <- 12 in
-let g = array.(6) <- 1 in
 let copy = Array.create size 1 in
 let copy = (copy_array array copy size) in
 let sorted = sort_array copy size in
