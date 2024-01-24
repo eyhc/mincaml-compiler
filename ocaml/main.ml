@@ -15,6 +15,7 @@ let type_only = ref false and asml_only = ref false and parse_only = ref false
 let test = ref false 
 let knorm_only = ref false and alpha = ref false 
 and let_reduc = ref false and closure = ref false and optim = ref false
+and back_print = ref false
 
 
 (* -n_iter *)
@@ -43,6 +44,7 @@ let speclist = [
   ("-test-alpha", Arg.Unit(fun () -> test := true; alpha :=true), "Alpha-reduction");
   ("-test-let", Arg.Unit(fun () -> test := true; let_reduc :=true), "Reduction of nested let-expression");
   ("-test-closure", Arg.Unit(fun () -> test := true; closure :=true), "Closure conversion");
+  ("-test-back", Arg.Unit(fun () -> test := true; back_print :=true), "Back code intermediaire");
   ("-test-optim", Arg.Unit(fun () -> test := true; optim :=true), "test optimisation")
 ]
 
@@ -133,6 +135,17 @@ let print_closure ast =
   let res = Closure.closure res in
     print_endline (Closure.to_string res)
 
+let print_back ast =
+  Typechecker.type_check ast;
+  let ast = Knorm.normalize ast in
+  let ast = Alpha.conversion ast in
+  let ast = Reduction.reduction ast in
+  let ast = Closure.closure ast in
+  let asml = Asml.generation ast in
+  let asml = ImmOptim.optim asml in
+  let b = RegAlloc.parcours asml in 
+  RegAlloc.print_reg_function b
+    
 let print_test f =
   let ast = get_ast f in
     if !knorm_only then
@@ -145,6 +158,11 @@ let print_test f =
       print_let_reduc ast
     else if !closure then
       print_closure ast
+    else if !back_print then
+      print_back ast
+    else
+      print_endline "The function you want to test is missing ! Put the corresponding argument : -knorm; -alpha; -let; -closure"
+
 
 (********************************************************)
 (********************************************************)
