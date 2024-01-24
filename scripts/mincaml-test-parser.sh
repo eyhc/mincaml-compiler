@@ -16,8 +16,6 @@ passed=0
 failed=0
 
 # run all test cases in syntax/valid and make sure they are parsed without error
-# run all test cases in syntax/invalid and make sure the parser returns an error
-
 echo "------------------ TESTING PARSER ------------------\n"
 for test_case in tests/syntax/valid/*.ml
 do
@@ -35,6 +33,7 @@ do
     fi
 done
 
+# run all test cases in syntax/invalid and make sure the parser returns an error
 for test_case in tests/syntax/invalid/*.ml
 do
     file=$(basename $test_case)
@@ -51,10 +50,13 @@ do
     fi
 done
 
+# show the results of the tests
 echo "\n---------- END TESTING ----------"
 echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they succeed to fail)"
 echo "Tests failed : $failed / $((passed + failed))"
 echo "-----------------------------------\n"
+
+# save the results into resultats_tests.txt
 echo "RESUME DES TESTS" > resultats_tests.txt
 echo "- Parser -" >> resultats_tests.txt
 echo "Tests passed : $passed / $((passed + failed)) (invalid tests are passed if they succeed to fail)" >> resultats_tests.txt
