@@ -50,7 +50,7 @@ do
     if [[ $float_files =~ $file ]]; then
         echo $($EXEC "$arm_file") 2> "$result" 1> "$result"
         res=""
-        for i in `cat $result`
+        for i in `cat "$result"`
             do res="${res} $(echo $i |  perl -pe 's/0+$//xg')"
         done
         echo $res > "$result"
