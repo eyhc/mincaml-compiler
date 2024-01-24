@@ -204,22 +204,25 @@ let main (inp:string) (out:string) : unit =
 
 (* MAIN *)
 let () = 
-  Arg.parse speclist (fun x -> input := x) usage_msg;
+  try 
+    Arg.parse speclist (fun x -> input := x) usage_msg;
 
-  if String.length !input = 0 then
-    show_help 1
-  else if !parse_only then
-    print_ast !input
-  else if !type_only then
-    type_check_only !input
-  else if !test then
-    print_test !input
-  else if !asml_only then
-    (if String.length !output = 0 then
-      print_asml !input None
+    if String.length !input = 0 then
+      show_help 1
+    else if !parse_only then
+      print_ast !input
+    else if !type_only then
+      type_check_only !input
+    else if !test then
+      print_test !input
+    else if !asml_only then
+      (if String.length !output = 0 then
+        print_asml !input None
+      else
+        print_asml !input (Some !output))
+    else if String.length !output = 0 then
+      show_help 1
     else
-      print_asml !input (Some !output))
-  else if String.length !output = 0 then
-    show_help 1
-  else
-    main !input !output
+      main !input !output
+  with
+  | e -> Printf.eprintf "%s\n" (Printexc.to_string e); exit(1)
