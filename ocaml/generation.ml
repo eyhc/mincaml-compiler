@@ -257,7 +257,7 @@ let rec generate_asm_regt : regt -> string list = function
       if s.[0] = 'r' then
         [Printf.sprintf "\tmov %s, #0" s]
       else
-        [Printf.sprintf "\tvmov.f32 %s, #0" s]
+        []
     | _ -> assert false)
 | Exp exp ->
 (match exp with
