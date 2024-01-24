@@ -21,6 +21,12 @@ let rec has_side_effects (a:Knorm.knorm_t) (env:Id.t list) : bool =
   | LetTuple (l1, v, e) -> has_side_effects e env
   | _ -> false
 
+let predef_with_side_effets: Id.t list = [
+  "print_int";
+  "print_float";
+  "print_newline"
+]
+
 
 type environment = (Id.t * int ref) list
 
@@ -28,20 +34,13 @@ type environment = (Id.t * int ref) list
 let rec env_incr (env:environment) (v:Id.t) : unit =
   match env with
   | [] -> ()
-  | (x,i)::l -> let _ = if x = v then incr i in env_incr l v
+  | (x,i)::l -> if x = v then incr i else env_incr l v
 
 let rec env_get (env:environment) (v:Id.t) : int =
   match env with
   | [] -> 0
   | (x,i)::l ->
     if x = v then !i else env_get l v
-
-
-let predef_with_side_effets: Id.t list = [
-  "print_int";
-  "print_float";
-  "print_newline";
-]
 
 (* Main function *)
 let elim_definition (ast:Knorm.knorm_t) : Knorm.knorm_t =
