@@ -80,35 +80,45 @@ _min_caml_print_float:
 .global _min_caml_cos
 _min_caml_cos:
     push {lr}
+    vmov.f32 r0, s0
     bl cosf
+    vmov.f32 s0, r0
     pop {lr}
     bx lr
 
 .global _min_caml_sin
 _min_caml_sin:
     push {lr}
+    vmov.f32 r0, s0
     bl sinf
+    vmov.f32 s0, r0
     pop {lr}
     bx lr
 
 .global _min_caml_sqrt
 _min_caml_sqrt:
     push {lr}
+    vmov.f32 r0, s0
     bl sqrtf
+    vmov.f32 s0, r0
     pop {lr}
     bx lr
 
 .global _min_caml_abs_float
 _min_caml_abs_float:
     push {lr}
+    vmov.f32 r0, s0
     bl fabsf
+    vmov.f32 s0, r0
     pop {lr}
     bx lr
 
 .global _min_caml_float_of_int
 _min_caml_float_of_int:
     push {lr}
+    vmov.f32 r0, s0
     bl __aeabi_i2f
+    vmov.f32 s0, r0
     pop {lr}
     bx lr
 
@@ -117,7 +127,9 @@ _min_caml_float_of_int:
 _min_caml_int_of_float:
 _min_caml_truncate:
     push {lr}
+    vmov.f32 r0, s0
     bl __aeabi_f2iz
+    vmov.f32 s0, r0
     pop {lr}
     bx lr
 
