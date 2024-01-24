@@ -74,9 +74,9 @@ do
 done
 
 # clean the generated arm files, assembler files and results files
-rm -f ${tests}/*.actual 2> /dev/null 1> /dev/null
-rm -f ${tests}/*.arm 2> /dev/null 1> /dev/null
-rm -f ${tests}/*.s 2> /dev/null 1> /dev/null
+rm -f ${tests_abs}/*.actual 2> /dev/null 1> /dev/null
+rm -f ${tests_abs}/*.arm 2> /dev/null 1> /dev/null
+rm -f ${tests_abs}/*.s 2> /dev/null 1> /dev/null
 
 # show the results of the tests
 echo -e "\n---------- END TESTING ----------"

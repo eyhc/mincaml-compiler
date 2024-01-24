@@ -108,10 +108,10 @@ let elim_definition (ast:Knorm.knorm_t) : Knorm.knorm_t =
               else e'
 
     | LetTuple (l1, v, e) -> 
-      let _ = env_incr env v in
-        let env' = (List.map (fun x -> (fst x, ref 0)) l1) @ env in
-          let e' = elim e env' env2 in
-            if (List.fold_left (fun x y -> x + (env_get env' (fst y))) 0 l1) <> 0 then
-              LetTuple(l1, v, e')
-            else e'
+      let env' = (List.map (fun x -> (fst x, ref 0)) l1) @ env in
+        let e' = elim e env' env2 in
+          if (List.fold_left (fun x y -> x + (env_get env' (fst y))) 0 l1) <> 0 then
+            let _ = env_incr env v in LetTuple(l1, v, e')
+          else e'
+
   in elim ast [] predef_with_side_effets
