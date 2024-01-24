@@ -76,21 +76,12 @@ let set_asml_file asml out_file =
 
 (*======= Tests fonctions =======*)
 let print_ast f =
-  let ast = get_ast f in
-    if !show_type then
-      print_endline (Syntax.to_string_with_types ast)
-    else
-      print_endline (Syntax.to_string ast)
+  let ast = get_ast f in ()
 
 (* Type Checking function *)
 let type_check_only f = 
   let ast = get_ast f in
-    Typechecker.type_check ast;
-    (if !show_type then
-      print_endline (Syntax.to_string_with_types ast)
-    else
-      print_endline (Syntax.to_string ast));
-    print_endline "Type inference : OK"
+    Typechecker.type_check ast
 
 (* Test compiler steps functions *)
 let print_knorm ast =

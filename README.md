@@ -2,6 +2,9 @@
 
 ## Groupe : LesPerdus
 
+## Langage analysé par le compilateur
+
+Le présent compilateur fonctionne sur l'ensemble du langage mincaml, excepté sur .... --> A VERIFIER
 
 ## Compilation
 
@@ -56,6 +59,10 @@ ocaml/mincamlc test.mml -o test.s -n_iter 1000
 ### Ensemble de tests
 
 Pour lancer l'ensemble des scripts de tests, utiliser simplement `make test` dans le dossier `ocaml/`.
+Sinon pour lancer un script de test en particulier, écrivez :
+```sh
+./scripts/script.sh
+```
 
 ### Tests avec qemu
 
