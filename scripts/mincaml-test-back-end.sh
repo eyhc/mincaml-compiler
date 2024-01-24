@@ -17,6 +17,7 @@ topics=("" "arithmetic operations" "call to external functions"
     "closure" "floats" )
 
 test_files=`ls "$tests"*.ml | grep -v front`
+float_files=`ls "$tests"*.ml | grep float`
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -51,7 +52,11 @@ do
     echo -n "Test on: "$file" ..."
     $MINCAMLC $OPTION "$test_case" -o "$file_generated"
     $CC "$file_generated" "$libmincaml" -o "$arm_file" $COMPILEOPT
-    echo $($EXEC "$arm_file") 2> "$result" 1> "$result"
+    if [[ $float_files =~ $file ]]; then
+        echo $($EXEC "$arm_file") | perl -pe 's/0+$//xg' 2> "$result" 1> "$result"
+    else
+        echo $($EXEC "$arm_file") 2> "$result" 1> "$result"
+    fi
     echo $(diff -s "$result" "$expected") 1> /dev/null
     if diff "$result" "$expected" 2> /dev/null 
         then 

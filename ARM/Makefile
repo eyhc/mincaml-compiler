@@ -14,7 +14,7 @@ echo:
 	echo ${PRG}
 
 %.arm : %.s libmincaml.S
-	${CC} -o $@ $^ -lm
+	${CC} -o $@ $^ -mfpu=fpv5-d16 -lm
 
 test: ${PRG}
 	@for p in ${PRG} ; do \
