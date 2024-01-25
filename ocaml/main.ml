@@ -160,8 +160,6 @@ let print_test f =
       print_closure ast
     else if !back_print then
       print_back ast
-    else
-      print_endline "The function you want to test is missing ! Put the corresponding argument : -knorm; -alpha; -let; -closure"
 
 
 (********************************************************)
@@ -192,8 +190,7 @@ let print_asml f_in f_out =
     let asml = ImmOptim.optim asml in    (* Immediate optimization *)
     (match f_out with
     | None -> print_endline (Asml.to_string asml)
-    | Some out -> set_asml_file asml out
-    )
+    | Some out -> set_asml_file asml out)
 
 
 (* Compile code file f to arm (32?) *)
