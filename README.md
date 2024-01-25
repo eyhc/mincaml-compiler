@@ -2,9 +2,12 @@
 
 ## Groupe : LesPerdus
 
+Ali BAYDOUN ; Romain BOSSY ; Elie CARROT ; Jorane GUIDETTI ; Seryozha HAKOBYAN ; Noémie PELLEGRIN.
+
 ## Langage analysé par le compilateur
 
-Le présent compilateur fonctionne sur l'ensemble du langage mincaml, excepté sur .... --> A VERIFIER
+Le présent compilateur fonctionne sur l'ensemble du langage mincaml.
+Cependant, cette version du compilateur ne gère pas les programmes mélangeant des nombres flottants et des entiers (c'est soit l'un, soit l'autre). En particulier, il ne gère pas les tableaux de flottants.
 
 ## Compilation
 
@@ -53,7 +56,7 @@ ocaml/mincamlc test.mml -o test.s -n_iter 0
 Pour fixer la taille maximale des fonctions dont le code est substitué par l'inline expansion (défaut 10).
 Par exemple :
 ```sh
-ocaml/mincamlc test.mml -o test.s -n_iter 1000
+ocaml/mincamlc test.mml -o test.s -inline_depth 50
 ```
 
 ### Ensemble de tests
@@ -108,13 +111,11 @@ ocaml/mincamlc -test-back test.mml
 ```
 
 
-Organization of the archive
+## Organization of the archive
 ```
 ARM/     arm source example and compilation with libmincaml   
 asml/    asml examples
-doc/     all the documentation, start with index.hml
-java/    MinCaml parser in Java + examples of tree traversal algo, if you do 
-         the project in java  
+doc/     all the documentation, start with index.hml 
 mincaml/ MinCaml examples
 ocaml/   MinCaml parser in OCaml, if you do the project in OCaml
 scripts/ put your test scripts and symbolic links there, and add this 

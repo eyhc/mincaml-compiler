@@ -146,7 +146,7 @@ let is_pos_adr chaine =
     false
 ;;
 
-(* Creer une copie d'une hashmap *)
+(* Cree une copie d'une hashmap *)
 let create_copy_hash hashmap =
   let newh = Hashtbl.create 0 in
   Hashtbl.iter (fun key value ->
@@ -158,7 +158,7 @@ let vider_hash hashmap =
       Hashtbl.remove hashmap key;
     ) hashmap;;
 
-(* Met a jour les registres disponible en fonction de la hashmap des variables associées aux registres *)
+(* Met a jour les registres disponibles en fonction de la hashmap des variables associées aux registres *)
 let update_reg_available var_to_register available_reg is_float=
   if is_float = 0 then
     available_reg:= registers
@@ -169,10 +169,10 @@ let update_reg_available var_to_register available_reg is_float=
     ) var_to_register;
 ;;
 
-(* Parcours un asml et donne les 7 prochaines variable utilisées 
+(* Parcours un asml et donne les 7 prochaines variables utilisées 
    Cas particulier : 
     - IFEQ ((s,i_o_s) , asmt1, asmt2) : ne rentre pas dans les asmt 
-- Functions : les variables qui sont dans r0, r1, r2 et r3 ne seront pas ajoutées a active *)
+- Functions : les variables qui sont dans r0, r1, r2 et r3 ne seront pas ajoutees a active *)
 let get_intervals_i asml var_to_register list_param=
   let list = ref [] in
   let rec i_intervals_asmt asmt =
@@ -238,7 +238,7 @@ let get_intervals_i asml var_to_register list_param=
   let l = list in l
 ;;
 
-(* Retourne les 30 prochaines variables utilisées dans le cas ou il y as des floats *)
+(* Retourne les 30 prochaines variables utilisées dans le cas ou il y a des floats *)
 let get_intervals_i_float asml float_to_reg list_param=
   let list = ref [] in
   let rec i_intervals_asmt asmt =
@@ -300,7 +300,7 @@ let get_intervals_i_float asml float_to_reg list_param=
   let l = list in l
 ;;
 
-(* Parcours la liste de variable a ajouter dans les registres et load si la var est deja presente dans la pile *)
+(* Parcours la liste de variables a ajouter dans les registres et load si la var est deja presente dans la pile *)
 let rec active_add act_add bd var_to_register var_in_stack available_reg is_float=
   match act_add with
   | hd :: tl ->
@@ -377,7 +377,7 @@ let store_load active body var_to_register var_in_stack list_params available_re
                  with e -> ());
               with e -> ());
              parcours_store tl (try (List.tl active_a_ajouter) with Failure tl -> []));
-(* Dans le cas ou il y a plus de variable a ajouter que de variable a store, on entre dans active_add *)
+(* Dans le cas ou il y a plus de variables a ajouter que de variables a store, on entre dans active_add *)
       | [] -> active_add active_a_ajouter body var_to_register var_in_stack available_reg is_float
     in
     let store = var_not_in_list var_to_register !active in
@@ -387,7 +387,7 @@ let store_load active body var_to_register var_in_stack list_params available_re
 ;;
 
 (* Prend en parametre la var_to_registres avant le if et la var_to_registres d'un then ou else,
-   puis on load toutes les variables qui ne sont pas dans la premiere hashmap ou qui ont un registres different afin de 
+   puis, load toutes les variables qui ne sont pas dans la premiere hashmap ou qui ont un registres different afin de 
 revenir a l'environnement de depart *)
 let load_if var_to_register var_to_register_asmt bd var_in_stack =
   Hashtbl.iter (fun key value ->
@@ -438,7 +438,7 @@ let store_to_regs_params lst bd var_to_register var_in_stack  =
   in store lst 0
 ;;
 
-(* Initialise var_to_register dans la fonction avec les 4 premiers registres qui contienne les parametres et ajoute dans var_in_stack les autres 
+(* Initialise var_to_register dans la fonction avec les 4 premiers registres qui contiennent les parametres et ajoute dans var_in_stack les autres 
 parametres avec des adresses positives : fp + 4*)
 let init_var_to_register_func var_to_register var_in_stack list_param =
   let rec parcours_param list count =
@@ -458,7 +458,7 @@ let init_var_to_register_func var_to_register var_in_stack list_param =
   parcours_param list_param 0
 ;;
 
-(* Fonction qui calcul la liste des prochaines variables utilisées, et store load
+(* Calcule la liste des prochaines variables utilisées, et store load
    et renvoie un registre pour la variable var1 *)
 let actualisation_registres asmt hash list_params bd var_in_stack var1 is_float=
   if is_float = 0 then begin 
@@ -474,7 +474,7 @@ let actualisation_registres asmt hash list_params bd var_in_stack var1 is_float=
     r
   end;;
 
-(* Fonction qui supprime une variable de la hashmap des registres et rend son registre disponible *)
+(* Supprime une variable de la hashmap des registres et rend son registre disponible *)
 let remove_hash_register hash var r = 
   let rec find_in_list lst elem = 
     match lst with
@@ -487,7 +487,7 @@ let remove_hash_register hash var r =
   end
 ;;
 
-(* Fonction qui calcul une adresse et l'ajoute dans la pile *)
+(* Calcule une adresse et l'ajoute dans la pile *)
 let add_in_stack var_in_stack list_params var =
   let adr = calcul_adr var_in_stack list_params in
   Hashtbl.add var_in_stack var adr ;
@@ -768,6 +768,8 @@ and print_reg_function reg_function =
   | Fun f :: tl ->  Printf.printf "Function name: %s\n" f.name;
       Printf.printf "Body:\n";
       List.iter (fun regt -> print_regt regt) f.body;
+      print_reg_function tl
+  | LetFloatReg (s1,s2) :: tl -> Printf.printf "(LetFloat :%s %s)\n" s1 s2;
       print_reg_function tl
   | [] -> ()
 

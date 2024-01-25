@@ -96,7 +96,7 @@ let rec gen_equations (expr:Syntax.t) (env:environment) (wanted:Type.t) : equati
   | Var id -> 
     (try
       let _,t1 = List.find (fun (x,y) -> x = id) env in [(t1, wanted)]
-    with Not_found -> failwith (Printf.sprintf "Var %s not found" id))
+    with Not_found -> failwith (Printf.sprintf "Typechecker : Var %s undefined" id))
 
   | If (e1, e2, e3) -> 
     let eq1 = gen_equations e1 env Type.Bool in
@@ -196,24 +196,24 @@ let rec resolution (el:equation list) : equation list =
         (try
           let r = (t3,t4)::(List.map2 (fun x y -> (x,y)) l3 l4) 
             in resolution (r @ l)
-        with Invalid_argument e -> failwith "not unifiable : failure of decomposition (function)")
+        with Invalid_argument e -> failwith "Typechecker : not unifiable : failure of decomposition (function)")
       | Tuple l1, Tuple l2 ->
         (try let r = List.map2 (fun x y -> (x,y)) l1 l2
           in resolution (r @ l)
-        with Invalid_argument e -> failwith "not unifiable : failure of decomposition (tuple)")
+        with Invalid_argument e -> failwith "Typechecker : not unifiable : failure of decomposition (tuple)")
       | Array t3, Array t4 -> resolution ((t3,t4)::l)
 
       (* Elimination of variable & failure of elimination *)
       | Var v,t ->
         if not (occur t t1) then
           let l3 = replace true l t1 t in (t1, t)::resolution l3
-        else failwith "not unifiable : failure of elimination"
+        else failwith "Typechecker : not unifiable : failure of elimination"
 
       (* Orient *)
       | t,Var v -> resolution ((Var v, t)::l)
 
       (* Failure of decomposition *)
-      | _ -> failwith "not unifiable : failure of decomposition"
+      | _ -> failwith "Typechecker : not unifiable : failure of decomposition"
 
 
 (* remove Var on right member of equation by substitution *)
