@@ -769,7 +769,7 @@ and print_reg_function reg_function =
       Printf.printf "Body:\n";
       List.iter (fun regt -> print_regt regt) f.body;
       print_reg_function tl
-  | LetFloatReg (s1,s2) :: tl -> Printf.printf "(LetFloat :%s %s)" s1 s2;
+  | LetFloatReg (s1,s2) :: tl -> Printf.printf "(LetFloat :%s %s)\n" s1 s2;
       print_reg_function tl
   | [] -> ()
 
