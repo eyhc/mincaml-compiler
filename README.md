@@ -115,7 +115,6 @@ ocaml/mincamlc -test-back test.mml
 ```
 ARM/     arm source example and compilation with libmincaml   
 asml/    asml examples
-doc/     all the documentation, start with index.hml 
 mincaml/ MinCaml examples
 ocaml/   MinCaml parser in OCaml, if you do the project in OCaml
 scripts/ put your test scripts and symbolic links there, and add this 
