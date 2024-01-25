@@ -77,8 +77,8 @@ let set_asml_file asml out_file =
 
 
 (*======= Tests fonctions =======*)
-let print_ast f =
-  let ast = get_ast f in ()
+let test_parse f =
+  let _ = get_ast f in ()
 
 (* Type Checking function *)
 let type_check_only f = 
@@ -219,7 +219,7 @@ let () =
     if String.length !input = 0 then
       show_help 1
     else if !parse_only then
-      print_ast !input
+      test_parse !input
     else if !type_only then
       type_check_only !input
     else if !test then
