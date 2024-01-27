@@ -1,13 +1,28 @@
-# Projet M1 INFO - Compilateur MinCaml
+# Projet - Compilateur MinCaml
 
-## Groupe : LesPerdus
+## Préambule
 
-Ali BAYDOUN ; Romain BOSSY ; Elie CARROT ; Jorane GUIDETTI ; Seryozha HAKOBYAN ; Noémie PELLEGRIN.
+Le présent projet est une variante (ou une suite) du projet de mi-semestre mené en 1re année de master informatique à l'Université de Grenoble.
+Il s'inspire des travaux d'Eijiro SUMII (cf http://esumii.github.io/min-caml/index-e.html)
+
+
+En particulier, mes plus grands remerciements à mes camarades de projet d'alors (par ordre alphabétique): Ali BAYDOUN ; Romain BOSSY ; Jorane GUIDETTI ; Seryozha HAKOBYAN ; Noémie PELLEGRIN.
 
 ## Langage analysé par le compilateur
 
-Le présent compilateur fonctionne sur l'ensemble du langage mincaml.
-Cependant, cette version du compilateur ne gère pas les programmes mélangeant des nombres flottants et des entiers (c'est soit l'un, soit l'autre). En particulier, il ne gère pas les tableaux de flottants.
+Il s'agit d'un sous-ensemble d'expressions d’OCaml :
+
+```
+e ::=  () | bool | int | float | x
+  | - e | e1 + e2 | e1 - e2 | e1 * e2 | e1 / e2         (* entier *)
+  | -.e | e1  +. e2 | e1 -. e2 | e 1 *. e2 | e1 /. e2   (* flottant *)
+  | not e | e1 = e2 | e1 <= e2 | e1 < e2 | e1 >= e2 | e1 > e2 
+  | if e1 then e2 else e3
+  | let x = e1 in e2
+  | let f x1 ... xn = e1 in e2 | e e1 ... en     (* appel d'une fonction *)
+  | let (x1,...,xn) = e1 in e2 | (e1,...,en)     (* tuples *)
+  | Array.create e1 e2 | e1.(e2) | e1.(e2) <- e3 (* tableaux *)
+```
 
 ## Compilation
 
@@ -108,20 +123,4 @@ ocaml/mincamlc -test-closure test.mml
 #  - asml conversion
 #  - register allocation
 ocaml/mincamlc -test-back test.mml
-```
-
-
-## Organization of the archive
-```
-ARM/     arm source example and compilation with libmincaml   
-asml/    asml examples
-mincaml/ MinCaml examples
-ocaml/   MinCaml parser in OCaml, if you do the project in OCaml
-scripts/ put your test scripts and symbolic links there, and add this 
-         directory to your path
-tests/   put your tests there
-tools/   asml intepreter (linux binary)
-
-We recommend that you add scripts/ and the dir that contains mincamlc to your
-PATH.
 ```

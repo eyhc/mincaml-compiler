@@ -2,7 +2,7 @@
 
 (* version *)
 let show_version () =
-  print_endline "MinCamlCompiler v0.3 - 25-01-2024";
+  print_endline "MinCamlCompiler v0.3.1 - 27-01-2024";
   exit 0
 
 (* Global variables for Arg's parser *)
@@ -174,12 +174,14 @@ let iter_optim ast =
     if n = 0 then ast
     else
       let a = Beta.reduction ast in          (* Beta reduction *)
-      let a = Reduction.reduction a in       (* Reduction of nested-let *)
       let a = Inline.expansion a in          (* Inline expansion *)
       let a = Constant.folding a in          (* Constant folding *)
       let a = Elim.elim_definition a in      (* Elim. unnecessary def *)
+      let a = Reduction.reduction a in       (* Reduction of nested-let *)
       iter_rec a (n-1) (* to do : si point fixe ???? *)
-  in iter_rec ast !n_iter_optim
+  in 
+    (if !n_iter_optim = 0 then Reduction.reduction ast 
+    else iter_rec ast !n_iter_optim)
 
 
 (* Display asml of file f*)
@@ -189,7 +191,6 @@ let print_asml f_in f_out =
     let ast = Knorm.normalize ast in     (* K-normalization *)
     let ast = Alpha.conversion ast in    (* Alpha-conversion *)
     let ast = iter_optim ast in          (* Optimizations *)
-    let ast = Reduction.reduction ast in (* Reduction of nested-let *)
     let ast = Closure.closure ast in     (* Closure conversion *)
     let asml = Asml.generation ast in    (* ASML generation *)
     let asml = ImmOptim.optim asml in    (* Immediate optimization *)
